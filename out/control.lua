@@ -470,15 +470,21 @@ function MachineProductionAnalysis.prototype.onBuilt(self, entity)
         self.machines[entity.unit_number] = {byRecipe = {}, timeBuilt = game.tick, lastProductsFinished = 0}
     end
 end
-function MachineProductionAnalysis.prototype.tryUpdateEntity(self, entity, status)
+function MachineProductionAnalysis.prototype.tryUpdateEntity(self, entity, status, onlyIfRecipeChanged)
+    if onlyIfRecipeChanged == nil then
+        onlyIfRecipeChanged = false
+    end
     if entity and entity.valid then
         local unitNumber = entity.unit_number
         if unitNumber and self.trackedMachines[unitNumber] then
-            self:updateEntity(entity, unitNumber, status)
+            self:updateEntity(entity, unitNumber, status, onlyIfRecipeChanged)
         end
     end
 end
-function MachineProductionAnalysis.prototype.updateEntity(self, entity, unitNumber, status)
+function MachineProductionAnalysis.prototype.updateEntity(self, entity, unitNumber, status, onlyIfRecipeChanged)
+    if onlyIfRecipeChanged == nil then
+        onlyIfRecipeChanged = false
+    end
     if not entity.valid then
         __TS__Delete(self.trackedMachines, unitNumber)
         return
@@ -490,7 +496,8 @@ function MachineProductionAnalysis.prototype.updateEntity(self, entity, unitNumb
     local ____opt_2 = entity.get_recipe()
     local recipe = ____opt_2 and ____opt_2.name
     local lastRecipe = machine.lastRecipe
-    if lastRecipe and recipe ~= lastRecipe then
+    local recipeChanged = lastRecipe and recipe ~= lastRecipe
+    if recipeChanged then
         local lastEntry = machine.byRecipe[lastRecipe]
         if lastEntry ~= nil then
             local ____lastEntry_production_4 = lastEntry.production
@@ -499,7 +506,7 @@ function MachineProductionAnalysis.prototype.updateEntity(self, entity, unitNumb
         machine.lastProductsFinished = entity.products_finished
         machine.lastRecipe = recipe
     end
-    if not recipe then
+    if not recipe or onlyIfRecipeChanged and not recipeChanged then
         return
     end
     if not machine.byRecipe[recipe] then
@@ -551,11 +558,11 @@ end
 function MachineProductionAnalysis.prototype.on_gui_closed(self, event)
     local entity = event.entity
     if entity then
-        self:tryUpdateEntity(entity)
+        self:tryUpdateEntity(entity, nil, true)
     end
 end
 function MachineProductionAnalysis.prototype.on_entity_settings_pasted(self, event)
-    self:tryUpdateEntity(event.destination)
+    self:tryUpdateEntity(event.destination, nil, true)
 end
 function MachineProductionAnalysis.prototype.on_nth_tick(self)
     for unitNumber, entity in pairs(self.trackedMachines) do

@@ -112,16 +112,16 @@ export default class MachineProductionAnalysis implements Analysis<MachineProduc
     }
   }
 
-  private tryUpdateEntity(entity: LuaEntity, status?: EntityStatus) {
+  private tryUpdateEntity(entity: LuaEntity, status?: EntityStatus, onlyIfRecipeChanged: boolean = false) {
     if (entity && entity.valid) {
       const unitNumber = entity.unit_number
       if (unitNumber && this.trackedMachines[unitNumber]) {
-        this.updateEntity(entity, unitNumber, status)
+        this.updateEntity(entity, unitNumber, status, onlyIfRecipeChanged)
       }
     }
   }
 
-  updateEntity(entity: LuaEntity, unitNumber: UnitNumber, status?: EntityStatus) {
+  updateEntity(entity: LuaEntity, unitNumber: UnitNumber, status?: EntityStatus, onlyIfRecipeChanged: boolean = false) {
     if (!entity.valid) {
       delete this.trackedMachines[unitNumber]
       return
@@ -134,7 +134,8 @@ export default class MachineProductionAnalysis implements Analysis<MachineProduc
     }
     const recipe = entity.get_recipe()?.name
     const lastRecipe = machine.lastRecipe
-    if (lastRecipe && recipe != lastRecipe) {
+    const recipeChanged = lastRecipe && recipe != lastRecipe
+    if (recipeChanged) {
       const lastEntry = machine.byRecipe[lastRecipe]
       if (lastEntry != undefined) {
         lastEntry.production.push([
@@ -148,7 +149,7 @@ export default class MachineProductionAnalysis implements Analysis<MachineProduc
       machine.lastRecipe = recipe
     }
 
-    if (!recipe) {
+    if (!recipe || (onlyIfRecipeChanged && !recipeChanged)) {
       return
     }
     if (!machine.byRecipe[recipe]) {
@@ -200,11 +201,11 @@ export default class MachineProductionAnalysis implements Analysis<MachineProduc
 
   on_gui_closed(event: OnGuiClosedEvent) {
     const entity = event.entity
-    if (entity) this.tryUpdateEntity(entity)
+    if (entity) this.tryUpdateEntity(entity, undefined, true)
   }
 
   on_entity_settings_pasted(event: OnEntitySettingsPastedEvent) {
-    this.tryUpdateEntity(event.destination)
+    this.tryUpdateEntity(event.destination, undefined, true)
   }
 
   on_nth_tick() {
