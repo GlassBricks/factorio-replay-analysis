@@ -163,22 +163,11 @@ export default class MachineProductionAnalysis implements Analysis<MachineProduc
       }
     }
     const entry = machine.byRecipe[recipe]
-    const productsFinished = entity.products_finished - machine.lastProductsFinished
+    const productsFinished = entity.products_finished
+    const delta = productsFinished - machine.lastProductsFinished
+    machine.lastProductsFinished = productsFinished
     status ??= this.getStatus(entity)
-    const numEntries = entry.production.length
-    if (
-      !(
-        numEntries > 0 &&
-        entry.production[numEntries - 1][1] == productsFinished &&
-        entry.production[numEntries - 1][2] == status
-      )
-    ) {
-      entry.production.push([
-        game.tick,
-        entity.products_finished - machine.lastProductsFinished,
-        status ?? this.getStatus(entity),
-      ])
-    }
+    entry.production.push([game.tick, delta, status ?? this.getStatus(entity)])
   }
 
   on_built_entity(event: OnBuiltEntityEvent) {
