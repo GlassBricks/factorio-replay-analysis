@@ -1,5 +1,5 @@
 import { NthTickEventData } from "factorio:runtime"
-import { Datum } from "../datum"
+import { Analysis } from "../analysis"
 
 interface PlayerPositionData {
   period: number
@@ -8,8 +8,8 @@ interface PlayerPositionData {
   }
 }
 
-export default class PlayerPosition implements Datum<PlayerPositionData> {
-  nth_tick_period = 60
+export default class PlayerPosition implements Analysis<PlayerPositionData> {
+  constructor(public nth_tick_period: number = 60) {}
 
   players: Record<string, [x: number, y: number][]> = {}
 
@@ -24,13 +24,12 @@ export default class PlayerPosition implements Datum<PlayerPositionData> {
         }
       }
       this.players[name].push([position.x, position.y])
-      log(`tick: ${event.tick}, name: ${name}, position: ${position.x}, ${position.y}`)
     }
   }
 
   exportData(): PlayerPositionData {
     return {
-      period: this.nth_tick_period / 60,
+      period: this.nth_tick_period,
       players: this.players,
     }
   }

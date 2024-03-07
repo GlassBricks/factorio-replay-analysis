@@ -58,7 +58,6 @@
       "error", {
         "allowWholeFile": true
       }
-    ],
-    "@typescript-eslint/explicit-module-boundary-types": "error"
+    ]
   }
 }
