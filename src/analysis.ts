@@ -89,7 +89,7 @@ add_lib({
 function getOutFileName(s: string): string {
   const lowerCamelCase = s[0].toLowerCase() + s.slice(1)
   if (lowerCamelCase.endsWith("Analysis")) {
-    return lowerCamelCase.slice(0, "Analysis".length)
+    return lowerCamelCase.slice(0, -"Analysis".length)
   }
   return lowerCamelCase
 }

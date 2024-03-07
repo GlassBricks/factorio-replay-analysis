@@ -27,6 +27,29 @@ local function __TS__StringAccess(self, index)
     end
 end
 
+local function __TS__StringEndsWith(self, searchString, endPosition)
+    if endPosition == nil or endPosition > #self then
+        endPosition = #self
+    end
+    return string.sub(self, endPosition - #searchString + 1, endPosition) == searchString
+end
+
+local function __TS__StringSlice(self, start, ____end)
+    if start == nil or start ~= start then
+        start = 0
+    end
+    if ____end ~= ____end then
+        ____end = 0
+    end
+    if start >= 0 then
+        start = start + 1
+    end
+    if ____end ~= nil and ____end < 0 then
+        ____end = ____end - 1
+    end
+    return string.sub(self, start, ____end)
+end
+
 local function __TS__Class(self)
     local c = {prototype = {}}
     c.prototype.__index = c.prototype
@@ -230,6 +253,8 @@ end
 
 return {
   __TS__StringAccess = __TS__StringAccess,
+  __TS__StringEndsWith = __TS__StringEndsWith,
+  __TS__StringSlice = __TS__StringSlice,
   __TS__Class = __TS__Class,
   __TS__SparseArrayNew = __TS__SparseArrayNew,
   __TS__SparseArrayPush = __TS__SparseArrayPush,
@@ -242,6 +267,8 @@ return {
 ["analysis"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__StringAccess = ____lualib.__TS__StringAccess
+local __TS__StringEndsWith = ____lualib.__TS__StringEndsWith
+local __TS__StringSlice = ____lualib.__TS__StringSlice
 local ____exports = {}
 local ____event_handler = require("event_handler")
 local add_lib = ____event_handler.add_lib
@@ -297,12 +324,16 @@ add_lib({
         getAnalyses(nil)
     end}
 })
-local function toLowerCamelCase(self, s)
-    return string.lower(__TS__StringAccess(s, 0)) .. string.sub(s, 2)
+local function getOutFileName(self, s)
+    local lowerCamelCase = string.lower(__TS__StringAccess(s, 0)) .. string.sub(s, 2)
+    if __TS__StringEndsWith(lowerCamelCase, "Analysis") then
+        return __TS__StringSlice(lowerCamelCase, 0, -#"Analysis")
+    end
+    return lowerCamelCase
 end
 function ____exports.exportAllAnalyses(self)
     for name, datum in pairs(global.analyses) do
-        local outname = ("analysis/" .. toLowerCamelCase(nil, name)) .. ".json"
+        local outname = ("analysis/" .. getOutFileName(nil, name)) .. ".json"
         log("Exporting " .. name)
         local data = game.table_to_json(datum:exportData())
         game.write_file(outname, data)
@@ -483,19 +514,18 @@ function MachineProductionAnalysis.prototype.updateEntity(self, entity, unitNumb
         }
     end
     local entry = machine.byRecipe[recipe]
-    local productsFinished = entity.products_finished - machine.lastProductsFinished
+    local productsFinished = entity.products_finished
+    local delta = productsFinished - machine.lastProductsFinished
+    machine.lastProductsFinished = productsFinished
     if status == nil then
         status = self:getStatus(entity)
     end
-    local numEntries = #entry.production
-    if not (numEntries > 0 and entry.production[numEntries][2] == productsFinished and entry.production[numEntries][3] == status) then
-        local ____entry_production_5 = entry.production
-        ____entry_production_5[#____entry_production_5 + 1] = {
-            game.tick,
-            entity.products_finished - machine.lastProductsFinished,
-            status or self:getStatus(entity)
-        }
-    end
+    local ____entry_production_5 = entry.production
+    ____entry_production_5[#____entry_production_5 + 1] = {
+        game.tick,
+        delta,
+        status or self:getStatus(entity)
+    }
 end
 function MachineProductionAnalysis.prototype.on_built_entity(self, event)
     self:onBuilt(event.created_entity)
@@ -602,9 +632,6 @@ return ____exports
 local handler = require("event_handler")
 handler.add_lib(require("freeplay"))
 handler.add_lib(require("silo-script"))
- end,
-["analyses.power-usage"] = function(...) 
---[[ Generated with https://github.com/TypeScriptToLua/TypeScriptToLua ]]
  end,
 }
 return require("control", ...)
