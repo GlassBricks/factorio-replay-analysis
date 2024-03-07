@@ -86,13 +86,17 @@ add_lib({
   },
 })
 
-function toLowerCamelCase(s: string): string {
-  return s[0].toLowerCase() + s.slice(1)
+function getOutFileName(s: string): string {
+  const lowerCamelCase = s[0].toLowerCase() + s.slice(1)
+  if (lowerCamelCase.endsWith("Analysis")) {
+    return lowerCamelCase.slice(0, "Analysis".length)
+  }
+  return lowerCamelCase
 }
 
 export function exportAllAnalyses(): void {
   for (const [name, datum] of pairs(global.analyses!)) {
-    const outname = `analysis/${toLowerCamelCase(name)}.json`
+    const outname = `analysis/${getOutFileName(name)}.json`
     log(`Exporting ${name}`)
     const data = game.table_to_json(datum.exportData())
     game.write_file(outname, data)
