@@ -346,6 +346,7 @@ return ____exports
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
 local ____exports = {}
+local floor = math.floor
 ____exports.default = __TS__Class()
 local PlayerPosition = ____exports.default
 PlayerPosition.name = "PlayerPosition"
@@ -360,19 +361,21 @@ function PlayerPosition.prototype.on_nth_tick(self, event)
     for ____, player in pairs(game.players) do
         local name = player.name
         local position = player.position
+        local x = floor(position.x + 0.5)
+        local y = floor(position.y + 0.5)
         if not self.players[name] then
             self.players[name] = {}
             do
                 local i = 0
                 while i < event.tick do
                     local ____self_players_name_0 = self.players[name]
-                    ____self_players_name_0[#____self_players_name_0 + 1] = {position.x, position.y}
+                    ____self_players_name_0[#____self_players_name_0 + 1] = {x, y}
                     i = i + self.nth_tick_period
                 end
             end
         end
         local ____self_players_name_1 = self.players[name]
-        ____self_players_name_1[#____self_players_name_1 + 1] = {position.x, position.y}
+        ____self_players_name_1[#____self_players_name_1 + 1] = {x, y}
     end
 end
 function PlayerPosition.prototype.exportData(self)

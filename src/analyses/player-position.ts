@@ -8,6 +8,7 @@ interface PlayerPositionData {
   }
 }
 
+const floor = math.floor
 export default class PlayerPosition implements Analysis<PlayerPositionData> {
   constructor(public nth_tick_period: number = 60) {}
 
@@ -17,13 +18,15 @@ export default class PlayerPosition implements Analysis<PlayerPositionData> {
     for (const [, player] of game.players) {
       const name = player.name
       const position = player.position
+      const x = floor(position.x + 0.5)
+      const y = floor(position.y + 0.5)
       if (!this.players[name]) {
         this.players[name] = []
         for (let i = 0; i < event.tick; i += this.nth_tick_period) {
-          this.players[name].push([position.x, position.y])
+          this.players[name].push([x, y])
         }
       }
-      this.players[name].push([position.x, position.y])
+      this.players[name].push([x, y])
     }
   }
 
