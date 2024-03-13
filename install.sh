@@ -1,9 +1,6 @@
 #!/usr/bin/env bash
-factorio_data_dir="$HOME/.factorio"
-save_file="DS MP/2024-03-05_DEFAULT_MP_1-53_29-noPB.zip"
-#save_file=$1
 
-target_zip="$factorio_data_dir/saves/$save_file"
+target_zip=$HOME/.factorio/saves/DS\ MP/1_38_53.zip
 echo "target_zip: $target_zip"
 
 if [ ! -f "$target_zip" ]; then

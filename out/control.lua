@@ -496,16 +496,16 @@ function MachineProductionAnalysis.prototype.updateEntity(self, entity, unitNumb
     local ____opt_2 = entity.get_recipe()
     local recipe = ____opt_2 and ____opt_2.name
     local lastRecipe = machine.lastRecipe
-    local recipeChanged = lastRecipe and recipe ~= lastRecipe
-    if recipeChanged then
+    local recipeChanged = recipe ~= lastRecipe
+    if recipeChanged and lastRecipe then
         local lastEntry = machine.byRecipe[lastRecipe]
         if lastEntry ~= nil then
             local ____lastEntry_production_4 = lastEntry.production
-            ____lastEntry_production_4[#____lastEntry_production_4 + 1] = {game.tick, entity.products_finished - machine.lastProductsFinished, status or "recipe-changed"}
+            ____lastEntry_production_4[#____lastEntry_production_4 + 1] = {game.tick, entity.products_finished - machine.lastProductsFinished, "recipe-changed"}
         end
         machine.lastProductsFinished = entity.products_finished
-        machine.lastRecipe = recipe
     end
+    machine.lastRecipe = recipe
     if not recipe or onlyIfRecipeChanged and not recipeChanged then
         return
     end

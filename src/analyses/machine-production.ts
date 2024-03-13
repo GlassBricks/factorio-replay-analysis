@@ -134,20 +134,20 @@ export default class MachineProductionAnalysis implements Analysis<MachineProduc
     }
     const recipe = entity.get_recipe()?.name
     const lastRecipe = machine.lastRecipe
-    const recipeChanged = lastRecipe && recipe != lastRecipe
-    if (recipeChanged) {
+    const recipeChanged = recipe != lastRecipe
+    if (recipeChanged && lastRecipe) {
       const lastEntry = machine.byRecipe[lastRecipe]
       if (lastEntry != undefined) {
         lastEntry.production.push([
           game.tick,
           entity.products_finished - machine.lastProductsFinished,
-          status ?? "recipe-changed",
+          "recipe-changed",
         ])
       }
 
       machine.lastProductsFinished = entity.products_finished
-      machine.lastRecipe = recipe
     }
+    machine.lastRecipe = recipe
 
     if (!recipe || (onlyIfRecipeChanged && !recipeChanged)) {
       return
