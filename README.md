@@ -7,6 +7,6 @@ To use:
 - Run the replay
 - Take a (new) save of the replay at some point
 - Load the save
-- run `/export-analysis`
+- run `/export-replay-data`
 
-Currrently, data is also exported immediately after first rocket launch.
+Currently, data is also exported immediately after first rocket launch.

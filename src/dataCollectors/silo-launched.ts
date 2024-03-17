@@ -1,7 +1,7 @@
-import { Analysis } from "../analysis"
+import { DataCollector } from "../dataCollector"
 import { OnRocketLaunchedEvent } from "factorio:runtime"
 
-export default class SiloLaunchTime implements Analysis<{ rocketLaunchTimes: number[] }> {
+export default class SiloLaunchTime implements DataCollector<{ rocketLaunchTimes: number[] }> {
   launchTimes: number[] = []
 
   on_rocket_launched(event: OnRocketLaunchedEvent): void {

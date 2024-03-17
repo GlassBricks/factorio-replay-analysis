@@ -1,5 +1,5 @@
 import { NthTickEventData } from "factorio:runtime"
-import { Analysis } from "../analysis"
+import { DataCollector } from "../dataCollector"
 
 interface PlayerPositionData {
   period: number
@@ -9,7 +9,7 @@ interface PlayerPositionData {
 }
 
 const floor = math.floor
-export default class PlayerPosition implements Analysis<PlayerPositionData> {
+export default class PlayerPosition implements DataCollector<PlayerPositionData> {
   constructor(public nth_tick_period: number = 60) {}
 
   players: Record<string, [x: number, y: number][]> = {}

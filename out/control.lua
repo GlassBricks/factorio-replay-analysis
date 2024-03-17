@@ -264,7 +264,7 @@ return {
   __TS__New = __TS__New
 }
  end,
-["analysis"] = function(...) 
+["dataCollector"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__StringAccess = ____lualib.__TS__StringAccess
 local __TS__StringEndsWith = ____lualib.__TS__StringEndsWith
@@ -272,48 +272,48 @@ local __TS__StringSlice = ____lualib.__TS__StringSlice
 local ____exports = {}
 local ____event_handler = require("event_handler")
 local add_lib = ____event_handler.add_lib
-local initialAnalyses = {}
-local function getAnalyses(self)
-    if not global.analyses then
-        global.analyses = initialAnalyses
+local initialDataCollectors = {}
+local function getDataCollectors(self)
+    if not global.dataCollectors then
+        global.dataCollectors = initialDataCollectors
     end
-    return global.analyses
+    return global.dataCollectors
 end
-function ____exports.addAnalysis(self, analysis)
+function ____exports.addDataCollector(self, dataCollector)
     local lib = {events = {}, on_nth_tick = {}}
-    local analysisName = analysis.constructor.name
+    local dataCollectorName = dataCollector.constructor.name
     script.register_metatable(
-        "analysis:" .. analysisName,
-        getmetatable(analysis)
+        "dataCollector:" .. dataCollectorName,
+        getmetatable(dataCollector)
     )
-    if initialAnalyses[analysisName] then
-        error("analysis already exists: " .. analysisName)
+    if initialDataCollectors[dataCollectorName] then
+        error("dataCollector already exists: " .. dataCollectorName)
     end
-    initialAnalyses[analysisName] = analysis
+    initialDataCollectors[dataCollectorName] = dataCollector
     for name, id in pairs(defines.events) do
-        if analysis[name] then
+        if dataCollector[name] then
             lib.events[id] = function(event)
-                local ____self_0 = getAnalyses(nil)[analysisName]
+                local ____self_0 = getDataCollectors(nil)[dataCollectorName]
                 ____self_0[name](____self_0, event)
             end
         end
     end
-    if analysis.on_nth_tick then
-        assert(analysis.nth_tick_period, "on_nth_tick requires nth_tick_period")
-        lib.on_nth_tick[analysis.nth_tick_period] = function(event)
-            getAnalyses(nil)[analysisName]:on_nth_tick(event)
+    if dataCollector.on_nth_tick then
+        assert(dataCollector.nth_tick_period, "on_nth_tick requires nth_tick_period")
+        lib.on_nth_tick[dataCollector.nth_tick_period] = function(event)
+            getDataCollectors(nil)[dataCollectorName]:on_nth_tick(event)
         end
     end
-    if analysis.on_init then
+    if dataCollector.on_init then
         lib.on_init = function()
-            getAnalyses(nil)[analysisName]:on_init()
+            getDataCollectors(nil)[dataCollectorName]:on_init()
         end
     end
     add_lib(lib)
 end
 add_lib({
     on_init = function()
-        getAnalyses(nil)
+        getDataCollectors(nil)
     end,
     on_load = function()
         if __DebugAdapter ~= nil then
@@ -321,28 +321,28 @@ add_lib({
         end
     end,
     events = {[defines.events.on_game_created_from_scenario] = function()
-        getAnalyses(nil)
+        getDataCollectors(nil)
     end}
 })
 local function getOutFileName(self, s)
     local lowerCamelCase = string.lower(__TS__StringAccess(s, 0)) .. string.sub(s, 2)
-    if __TS__StringEndsWith(lowerCamelCase, "Analysis") then
-        return __TS__StringSlice(lowerCamelCase, 0, -#"Analysis")
+    if __TS__StringEndsWith(lowerCamelCase, "DataCollector") then
+        return __TS__StringSlice(lowerCamelCase, 0, -#"DataCollector")
     end
     return lowerCamelCase
 end
-function ____exports.exportAllAnalyses(self)
-    for name, datum in pairs(global.analyses) do
-        local outname = ("analysis/" .. getOutFileName(nil, name)) .. ".json"
+function ____exports.exportAllDataCollectors(self)
+    for name, datum in pairs(global.dataCollectors) do
+        local outname = ("dataCollector/" .. getOutFileName(nil, name)) .. ".json"
         log("Exporting " .. name)
         local data = game.table_to_json(datum:exportData())
         game.write_file(outname, data)
     end
-    log("Exported analysis data to script-output/analysis/*.json")
+    log("Exported dataCollector data to script-output/dataCollector/*.json")
 end
 return ____exports
  end,
-["analyses.player-position"] = function(...) 
+["dataCollectors.player-position"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
 local ____exports = {}
@@ -383,7 +383,7 @@ function PlayerPosition.prototype.exportData(self)
 end
 return ____exports
  end,
-["analyses.silo-launched"] = function(...) 
+["dataCollectors.silo-launched"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
 local ____exports = {}
@@ -402,7 +402,7 @@ function SiloLaunchTime.prototype.exportData(self)
 end
 return ____exports
  end,
-["analyses.machine-production"] = function(...) 
+["dataCollectors.machine-production"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
 local __TS__SparseArrayNew = ____lualib.__TS__SparseArrayNew
@@ -412,9 +412,9 @@ local __TS__ArrayIncludes = ____lualib.__TS__ArrayIncludes
 local __TS__Delete = ____lualib.__TS__Delete
 local ____exports = {}
 ____exports.default = __TS__Class()
-local MachineProductionAnalysis = ____exports.default
-MachineProductionAnalysis.name = "MachineProductionAnalysis"
-function MachineProductionAnalysis.prototype.____constructor(self, prototypes, nth_tick_period)
+local MachineProductionDataCollector = ____exports.default
+MachineProductionDataCollector.name = "MachineProductionDataCollector"
+function MachineProductionDataCollector.prototype.____constructor(self, prototypes, nth_tick_period)
     if nth_tick_period == nil then
         nth_tick_period = 60 * 5
     end
@@ -424,14 +424,14 @@ function MachineProductionAnalysis.prototype.____constructor(self, prototypes, n
     self.machines = {}
     self.nth_tick_period = nth_tick_period
 end
-function MachineProductionAnalysis.prototype.on_init(self)
+function MachineProductionDataCollector.prototype.on_init(self)
     for ____, name in ipairs(self.prototypes) do
         local prototype = game.entity_prototypes[name]
         assert(prototype, "prototype not found: " .. name)
         assert(prototype.type == "assembling-machine" or prototype.type == "furnace" or prototype.type == "rocket-silo", "Not a crafting machine or furnace: " .. name)
     end
 end
-function MachineProductionAnalysis.prototype.getStatus(self, entity)
+function MachineProductionDataCollector.prototype.getStatus(self, entity)
     local commonKeys = {
         "working",
         "normal",
@@ -467,13 +467,13 @@ function MachineProductionAnalysis.prototype.getStatus(self, entity)
     end
     return "unknown"
 end
-function MachineProductionAnalysis.prototype.onBuilt(self, entity)
+function MachineProductionDataCollector.prototype.onBuilt(self, entity)
     if __TS__ArrayIncludes(self.prototypes, entity.name) and entity.unit_number then
         self.trackedMachines[entity.unit_number] = entity
         self.machines[entity.unit_number] = {byRecipe = {}, timeBuilt = game.tick, lastProductsFinished = 0}
     end
 end
-function MachineProductionAnalysis.prototype.tryUpdateEntity(self, entity, status, onlyIfRecipeChanged)
+function MachineProductionDataCollector.prototype.tryUpdateEntity(self, entity, status, onlyIfRecipeChanged)
     if onlyIfRecipeChanged == nil then
         onlyIfRecipeChanged = false
     end
@@ -484,7 +484,7 @@ function MachineProductionAnalysis.prototype.tryUpdateEntity(self, entity, statu
         end
     end
 end
-function MachineProductionAnalysis.prototype.updateEntity(self, entity, unitNumber, status, onlyIfRecipeChanged)
+function MachineProductionDataCollector.prototype.updateEntity(self, entity, unitNumber, status, onlyIfRecipeChanged)
     if onlyIfRecipeChanged == nil then
         onlyIfRecipeChanged = false
     end
@@ -537,42 +537,42 @@ function MachineProductionAnalysis.prototype.updateEntity(self, entity, unitNumb
         status or self:getStatus(entity)
     }
 end
-function MachineProductionAnalysis.prototype.on_built_entity(self, event)
+function MachineProductionDataCollector.prototype.on_built_entity(self, event)
     self:onBuilt(event.created_entity)
 end
-function MachineProductionAnalysis.prototype.on_robot_built_entity(self, event)
+function MachineProductionDataCollector.prototype.on_robot_built_entity(self, event)
     self:onBuilt(event.created_entity)
 end
-function MachineProductionAnalysis.prototype.on_pre_player_mined_item(self, event)
+function MachineProductionDataCollector.prototype.on_pre_player_mined_item(self, event)
     self:tryUpdateEntity(event.entity, "mined")
 end
-function MachineProductionAnalysis.prototype.on_robot_pre_mined(self, event)
+function MachineProductionDataCollector.prototype.on_robot_pre_mined(self, event)
     self:tryUpdateEntity(event.entity, "mined")
 end
-function MachineProductionAnalysis.prototype.on_entity_died(self, event)
+function MachineProductionDataCollector.prototype.on_entity_died(self, event)
     self:tryUpdateEntity(event.entity, "entity-died")
 end
-function MachineProductionAnalysis.prototype.on_marked_for_deconstruction(self, event)
+function MachineProductionDataCollector.prototype.on_marked_for_deconstruction(self, event)
     self:tryUpdateEntity(event.entity)
 end
-function MachineProductionAnalysis.prototype.on_cancelled_deconstruction(self, event)
+function MachineProductionDataCollector.prototype.on_cancelled_deconstruction(self, event)
     self:tryUpdateEntity(event.entity)
 end
-function MachineProductionAnalysis.prototype.on_gui_closed(self, event)
+function MachineProductionDataCollector.prototype.on_gui_closed(self, event)
     local entity = event.entity
     if entity then
         self:tryUpdateEntity(entity, nil, true)
     end
 end
-function MachineProductionAnalysis.prototype.on_entity_settings_pasted(self, event)
+function MachineProductionDataCollector.prototype.on_entity_settings_pasted(self, event)
     self:tryUpdateEntity(event.destination, nil, true)
 end
-function MachineProductionAnalysis.prototype.on_nth_tick(self)
+function MachineProductionDataCollector.prototype.on_nth_tick(self)
     for unitNumber, entity in pairs(self.trackedMachines) do
         self:updateEntity(entity, unitNumber)
     end
 end
-function MachineProductionAnalysis.prototype.exportData(self)
+function MachineProductionDataCollector.prototype.exportData(self)
     local totalSize = 0
     local machines = {}
     for ____, machine in pairs(self.machines) do
@@ -594,27 +594,27 @@ local __TS__New = ____lualib.__TS__New
 local ____exports = {}
 local ____event_handler = require("event_handler")
 local add_lib = ____event_handler.add_lib
-local ____analysis = require("analysis")
-local addAnalysis = ____analysis.addAnalysis
-local exportAllAnalyses = ____analysis.exportAllAnalyses
-local ____player_2Dposition = require("analyses.player-position")
+local ____dataCollector = require("dataCollector")
+local addDataCollector = ____dataCollector.addDataCollector
+local exportAllDataCollectors = ____dataCollector.exportAllDataCollectors
+local ____player_2Dposition = require("dataCollectors.player-position")
 local PlayerPositions = ____player_2Dposition.default
-local ____silo_2Dlaunched = require("analyses.silo-launched")
+local ____silo_2Dlaunched = require("dataCollectors.silo-launched")
 local SiloLaunchTimes = ____silo_2Dlaunched.default
-local ____machine_2Dproduction = require("analyses.machine-production")
-local MachineProductionAnalysis = ____machine_2Dproduction.default
+local ____machine_2Dproduction = require("dataCollectors.machine-production")
+local MachineProductionDataCollector = ____machine_2Dproduction.default
 local exportOnSiloLaunch = true
-addAnalysis(
+addDataCollector(
     nil,
     __TS__New(PlayerPositions)
 )
-addAnalysis(
+addDataCollector(
     nil,
     __TS__New(SiloLaunchTimes)
 )
-addAnalysis(
+addDataCollector(
     nil,
-    __TS__New(MachineProductionAnalysis, {
+    __TS__New(MachineProductionDataCollector, {
         "assembling-machine-1",
         "assembling-machine-2",
         "assembling-machine-3",
@@ -625,14 +625,14 @@ addAnalysis(
     })
 )
 if exportOnSiloLaunch then
-    add_lib({events = {[defines.events.on_rocket_launched] = function() return exportAllAnalyses(nil) end}})
+    add_lib({events = {[defines.events.on_rocket_launched] = function() return exportAllDataCollectors(nil) end}})
 end
 commands.add_command(
-    "export-analysis",
-    "Export current analysis data",
+    "export-dataCollector",
+    "Export current dataCollector data",
     function()
-        exportAllAnalyses(nil)
-        game.print("Exported analysis data to script-output/analysis/*.json")
+        exportAllDataCollectors(nil)
+        game.print("Exported dataCollector data to script-output/dataCollector/*.json")
     end
 )
 require("old-control")

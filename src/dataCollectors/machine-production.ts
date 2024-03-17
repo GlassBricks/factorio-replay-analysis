@@ -1,5 +1,5 @@
 import { MapPosition } from "factorio:prototype"
-import { Analysis } from "../analysis"
+import { DataCollector } from "../dataCollector"
 import {
   LuaEntity,
   OnBuiltEntityEvent,
@@ -15,7 +15,7 @@ import {
 
 type EntityStatus = keyof typeof defines.entity_status | "recipe-changed" | "unknown" | "mined" | "entity-died"
 
-interface MachineProduction {
+interface SingleMachineData {
   name: string
   recipe: string
   unitNumber: number
@@ -27,12 +27,12 @@ interface MachineProduction {
 
 interface MachineProductionData {
   period: number
-  machines: MachineProduction[]
+  machines: SingleMachineData[]
 }
 
 // assemblers, chem plants, refineries, furnaces
 
-export default class MachineProductionAnalysis implements Analysis<MachineProductionData> {
+export default class MachineProductionDataCollector implements DataCollector<MachineProductionData> {
   constructor(
     public prototypes: string[],
     public nth_tick_period: number = 60 * 5,
@@ -44,7 +44,7 @@ export default class MachineProductionAnalysis implements Analysis<MachineProduc
 
   machines: {
     [unitNumber: UnitNumber]: {
-      byRecipe: Record<string, MachineProduction>
+      byRecipe: Record<string, SingleMachineData>
       timeBuilt: number
       lastRecipe?: string
       lastProductsFinished: number
@@ -216,7 +216,7 @@ export default class MachineProductionAnalysis implements Analysis<MachineProduc
 
   exportData(): MachineProductionData {
     let totalSize = 0
-    const machines: MachineProduction[] = []
+    const machines: SingleMachineData[] = []
     for (const [, machine] of pairs(this.machines)) {
       for (const [, production] of pairs(machine.byRecipe)) {
         if (production.production.length > 0) {

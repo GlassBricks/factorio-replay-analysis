@@ -1,17 +1,17 @@
 import { add_lib } from "event_handler"
-import { addAnalysis, exportAllAnalyses } from "./analysis"
-import PlayerPositions from "./analyses/player-position"
-import SiloLaunchTimes from "./analyses/silo-launched"
-import MachineProductionAnalysis from "./analyses/machine-production"
+import { addDataCollector, exportAllDataCollectors } from "./dataCollector"
+import PlayerPositions from "./dataCollectors/player-position"
+import SiloLaunchTimes from "./dataCollectors/silo-launched"
+import MachineProductionDataCollector from "./dataCollectors/machine-production"
 
 const exportOnSiloLaunch = true
 
 // datums
-addAnalysis(new PlayerPositions())
-addAnalysis(new SiloLaunchTimes())
+addDataCollector(new PlayerPositions())
+addDataCollector(new SiloLaunchTimes())
 
-addAnalysis(
-  new MachineProductionAnalysis([
+addDataCollector(
+  new MachineProductionDataCollector([
     "assembling-machine-1",
     "assembling-machine-2",
     "assembling-machine-3",
@@ -26,14 +26,14 @@ addAnalysis(
 if (exportOnSiloLaunch) {
   add_lib({
     events: {
-      [defines.events.on_rocket_launched]: () => exportAllAnalyses(),
+      [defines.events.on_rocket_launched]: () => exportAllDataCollectors(),
     },
   })
 }
 
-commands.add_command("export-analysis", "Export current analysis data", () => {
-  exportAllAnalyses()
-  game.print("Exported analysis data to script-output/analysis/*.json")
+commands.add_command("export-replay-data", "Export current dataCollector data", () => {
+  exportAllDataCollectors()
+  game.print("Exported dataCollector data to script-output/dataCollector/*.json")
 })
 
 require("./old-control")
