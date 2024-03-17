@@ -1,5 +1,5 @@
 import { NthTickEventData } from "factorio:runtime"
-import { DataCollector } from "../dataCollector"
+import { DataCollector } from "../data-collector"
 
 interface PlayerPositionData {
   period: number

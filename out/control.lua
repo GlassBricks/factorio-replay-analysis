@@ -57,51 +57,6 @@ local function __TS__Class(self)
     return c
 end
 
-local function __TS__CountVarargs(...)
-    return select("#", ...)
-end
-
-local function __TS__SparseArrayNew(...)
-    local sparseArray = {...}
-    sparseArray.sparseLength = __TS__CountVarargs(...)
-    return sparseArray
-end
-
-local function __TS__SparseArrayPush(sparseArray, ...)
-    local args = {...}
-    local argsLen = __TS__CountVarargs(...)
-    local listLen = sparseArray.sparseLength
-    for i = 1, argsLen do
-        sparseArray[listLen + i] = args[i]
-    end
-    sparseArray.sparseLength = listLen + argsLen
-end
-
-local function __TS__SparseArraySpread(sparseArray)
-    local _unpack = unpack or table.unpack
-    return _unpack(sparseArray, 1, sparseArray.sparseLength)
-end
-
-local function __TS__ArrayIncludes(self, searchElement, fromIndex)
-    if fromIndex == nil then
-        fromIndex = 0
-    end
-    local len = #self
-    local k = fromIndex
-    if fromIndex < 0 then
-        k = len + fromIndex
-    end
-    if k < 0 then
-        k = 0
-    end
-    for i = k + 1, len do
-        if self[i] == searchElement then
-            return true
-        end
-    end
-    return false
-end
-
 local function __TS__StringIncludes(self, searchString, position)
     if not position then
         position = 1
@@ -251,20 +206,45 @@ local function __TS__Delete(target, key)
     return true
 end
 
+local function __TS__CountVarargs(...)
+    return select("#", ...)
+end
+
+local function __TS__SparseArrayNew(...)
+    local sparseArray = {...}
+    sparseArray.sparseLength = __TS__CountVarargs(...)
+    return sparseArray
+end
+
+local function __TS__SparseArrayPush(sparseArray, ...)
+    local args = {...}
+    local argsLen = __TS__CountVarargs(...)
+    local listLen = sparseArray.sparseLength
+    for i = 1, argsLen do
+        sparseArray[listLen + i] = args[i]
+    end
+    sparseArray.sparseLength = listLen + argsLen
+end
+
+local function __TS__SparseArraySpread(sparseArray)
+    local _unpack = unpack or table.unpack
+    return _unpack(sparseArray, 1, sparseArray.sparseLength)
+end
+
 return {
   __TS__StringAccess = __TS__StringAccess,
   __TS__StringEndsWith = __TS__StringEndsWith,
   __TS__StringSlice = __TS__StringSlice,
   __TS__Class = __TS__Class,
+  __TS__Delete = __TS__Delete,
+  __TS__ClassExtends = __TS__ClassExtends,
   __TS__SparseArrayNew = __TS__SparseArrayNew,
   __TS__SparseArrayPush = __TS__SparseArrayPush,
   __TS__SparseArraySpread = __TS__SparseArraySpread,
-  __TS__ArrayIncludes = __TS__ArrayIncludes,
-  __TS__Delete = __TS__Delete,
   __TS__New = __TS__New
 }
  end,
-["dataCollector"] = function(...) 
+["data-collector"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__StringAccess = ____lualib.__TS__StringAccess
 local __TS__StringEndsWith = ____lualib.__TS__StringEndsWith
@@ -331,14 +311,14 @@ local function getOutFileName(self, s)
     end
     return lowerCamelCase
 end
-function ____exports.exportAllDataCollectors(self)
+function ____exports.exportAllData(self)
     for name, datum in pairs(global.dataCollectors) do
-        local outname = ("dataCollector/" .. getOutFileName(nil, name)) .. ".json"
+        local outname = ("replay-data/" .. getOutFileName(nil, name)) .. ".json"
         log("Exporting " .. name)
         local data = game.table_to_json(datum:exportData())
         game.write_file(outname, data)
     end
-    log("Exported dataCollector data to script-output/dataCollector/*.json")
+    log("Exported dataCollector data to script-output/replay-data/*.json")
 end
 return ____exports
  end,
@@ -383,55 +363,115 @@ function PlayerPosition.prototype.exportData(self)
 end
 return ____exports
  end,
-["dataCollectors.silo-launched"] = function(...) 
+["dataCollectors.entity-tracker"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
+local __TS__Delete = ____lualib.__TS__Delete
 local ____exports = {}
 ____exports.default = __TS__Class()
-local SiloLaunchTime = ____exports.default
-SiloLaunchTime.name = "SiloLaunchTime"
-function SiloLaunchTime.prototype.____constructor(self)
-    self.launchTimes = {}
+local EntityTracker = ____exports.default
+EntityTracker.name = "EntityTracker"
+function EntityTracker.prototype.____constructor(self, ...)
+    local prototypeFilters = {...}
+    self.prototypes = {}
+    self.trackedEntities = {}
+    self.entityData = {}
+    self.prototypeFilters = prototypeFilters
 end
-function SiloLaunchTime.prototype.on_rocket_launched(self, event)
-    local ____self_launchTimes_0 = self.launchTimes
-    ____self_launchTimes_0[#____self_launchTimes_0 + 1] = event.tick
+function EntityTracker.prototype.on_init(self)
+    for name in pairs(game.get_filtered_entity_prototypes(self.prototypeFilters)) do
+        self.prototypes[name] = true
+    end
+    __TS__Delete(self, "prototypeFilters")
 end
-function SiloLaunchTime.prototype.exportData(self)
-    return {rocketLaunchTimes = self.launchTimes}
+function EntityTracker.prototype.onCreated(self, entity, event)
+    local unitNumber = entity.unit_number
+    if unitNumber and self.prototypes[entity.name] ~= nil then
+        local data = self:initialData(entity, event)
+        if data then
+            self.trackedEntities[unitNumber] = entity
+            self.entityData[unitNumber] = data
+        end
+    end
+end
+function EntityTracker.prototype.on_built_entity(self, event)
+    self:onCreated(event.created_entity, event)
+end
+function EntityTracker.prototype.on_robot_built_entity(self, event)
+    self:onCreated(event.created_entity, event)
+end
+function EntityTracker.prototype.onDeleted(self, entity, event)
+    local unitNumber = entity.unit_number
+    if unitNumber then
+        self:removeEntry(unitNumber)
+    end
+end
+function EntityTracker.prototype.removeEntry(self, unitNumber)
+    __TS__Delete(self.trackedEntities, unitNumber)
+end
+function EntityTracker.prototype.on_pre_player_mined_item(self, event)
+    self:onDeleted(event.entity, event)
+end
+function EntityTracker.prototype.on_robot_pre_mined(self, event)
+    self:onDeleted(event.entity, event)
+end
+function EntityTracker.prototype.on_entity_died(self, event)
+    self:onDeleted(event.entity, event)
+end
+function EntityTracker.prototype.getEntityData(self, entity, unitNumber)
+    if not entity.valid then
+        if unitNumber then
+            __TS__Delete(self.trackedEntities, unitNumber)
+        end
+        return nil
+    end
+    if unitNumber == nil then
+        unitNumber = entity.unit_number
+    end
+    if unitNumber then
+        return self.entityData[unitNumber]
+    end
+    return nil
+end
+function EntityTracker.prototype.on_nth_tick(self)
+    for unitNumber, entity in pairs(self.trackedEntities) do
+        local data = self:getEntityData(entity, unitNumber)
+        if data then
+            self:onPeriodicUpdate(entity, data)
+        end
+    end
 end
 return ____exports
  end,
 ["dataCollectors.machine-production"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
+local __TS__ClassExtends = ____lualib.__TS__ClassExtends
 local __TS__SparseArrayNew = ____lualib.__TS__SparseArrayNew
 local __TS__SparseArrayPush = ____lualib.__TS__SparseArrayPush
 local __TS__SparseArraySpread = ____lualib.__TS__SparseArraySpread
-local __TS__ArrayIncludes = ____lualib.__TS__ArrayIncludes
-local __TS__Delete = ____lualib.__TS__Delete
 local ____exports = {}
+local ____entity_2Dtracker = require("dataCollectors.entity-tracker")
+local EntityTracker = ____entity_2Dtracker.default
 ____exports.default = __TS__Class()
-local MachineProductionDataCollector = ____exports.default
-MachineProductionDataCollector.name = "MachineProductionDataCollector"
-function MachineProductionDataCollector.prototype.____constructor(self, prototypes, nth_tick_period)
+local MachineProduction = ____exports.default
+MachineProduction.name = "MachineProduction"
+__TS__ClassExtends(MachineProduction, EntityTracker)
+function MachineProduction.prototype.____constructor(self, prototypes, nth_tick_period)
     if nth_tick_period == nil then
         nth_tick_period = 60 * 5
     end
-    self.prototypes = prototypes
-    self.nth_tick_period = nth_tick_period
-    self.trackedMachines = {}
-    self.machines = {}
+    EntityTracker.prototype.____constructor(self, {filter = "name", name = prototypes})
     self.nth_tick_period = nth_tick_period
 end
-function MachineProductionDataCollector.prototype.on_init(self)
-    for ____, name in ipairs(self.prototypes) do
+function MachineProduction.prototype.on_init(self)
+    EntityTracker.prototype.on_init(self)
+    for name in pairs(self.prototypes) do
         local prototype = game.entity_prototypes[name]
-        assert(prototype, "prototype not found: " .. name)
         assert(prototype.type == "assembling-machine" or prototype.type == "furnace" or prototype.type == "rocket-silo", "Not a crafting machine or furnace: " .. name)
     end
 end
-function MachineProductionDataCollector.prototype.getStatus(self, entity)
+function MachineProduction.prototype.getStatus(self, entity)
     local commonKeys = {
         "working",
         "normal",
@@ -467,66 +507,53 @@ function MachineProductionDataCollector.prototype.getStatus(self, entity)
     end
     return "unknown"
 end
-function MachineProductionDataCollector.prototype.onBuilt(self, entity)
-    if __TS__ArrayIncludes(self.prototypes, entity.name) and entity.unit_number then
-        self.trackedMachines[entity.unit_number] = entity
-        self.machines[entity.unit_number] = {byRecipe = {}, timeBuilt = game.tick, lastProductsFinished = 0}
-    end
+function MachineProduction.prototype.initialData(self)
+    return {byRecipe = {}, timeBuilt = game.tick, lastProductsFinished = 0}
 end
-function MachineProductionDataCollector.prototype.tryUpdateEntity(self, entity, status, onlyIfRecipeChanged)
+function MachineProduction.prototype.tryUpdateEntity(self, entity, status, onlyIfRecipeChanged)
     if onlyIfRecipeChanged == nil then
         onlyIfRecipeChanged = false
     end
-    if entity and entity.valid then
-        local unitNumber = entity.unit_number
-        if unitNumber and self.trackedMachines[unitNumber] then
-            self:updateEntity(entity, unitNumber, status, onlyIfRecipeChanged)
-        end
+    local info = self:getEntityData(entity)
+    if info then
+        self:updateEntity(entity, info, status, onlyIfRecipeChanged)
     end
 end
-function MachineProductionDataCollector.prototype.updateEntity(self, entity, unitNumber, status, onlyIfRecipeChanged)
+function MachineProduction.prototype.updateEntity(self, entity, info, status, onlyIfRecipeChanged)
     if onlyIfRecipeChanged == nil then
         onlyIfRecipeChanged = false
-    end
-    if not entity.valid then
-        __TS__Delete(self.trackedMachines, unitNumber)
-        return
-    end
-    local machine = self.machines[unitNumber]
-    if not machine then
-        return
     end
     local ____opt_2 = entity.get_recipe()
     local recipe = ____opt_2 and ____opt_2.name
-    local lastRecipe = machine.lastRecipe
+    local lastRecipe = info.lastRecipe
     local recipeChanged = recipe ~= lastRecipe
     if recipeChanged and lastRecipe then
-        local lastEntry = machine.byRecipe[lastRecipe]
+        local lastEntry = info.byRecipe[lastRecipe]
         if lastEntry ~= nil then
             local ____lastEntry_production_4 = lastEntry.production
-            ____lastEntry_production_4[#____lastEntry_production_4 + 1] = {game.tick, entity.products_finished - machine.lastProductsFinished, "recipe-changed"}
+            ____lastEntry_production_4[#____lastEntry_production_4 + 1] = {game.tick, entity.products_finished - info.lastProductsFinished, "recipe-changed"}
         end
-        machine.lastProductsFinished = entity.products_finished
+        info.lastProductsFinished = entity.products_finished
     end
-    machine.lastRecipe = recipe
+    info.lastRecipe = recipe
     if not recipe or onlyIfRecipeChanged and not recipeChanged then
         return
     end
-    if not machine.byRecipe[recipe] then
-        machine.byRecipe[recipe] = {
+    if not info.byRecipe[recipe] then
+        info.byRecipe[recipe] = {
             name = entity.name,
             recipe = recipe,
-            unitNumber = unitNumber,
+            unitNumber = entity.unit_number,
             location = entity.position,
-            timeBuilt = machine.timeBuilt,
+            timeBuilt = info.timeBuilt,
             timeStarted = game.tick,
             production = {}
         }
     end
-    local entry = machine.byRecipe[recipe]
+    local entry = info.byRecipe[recipe]
     local productsFinished = entity.products_finished
-    local delta = productsFinished - machine.lastProductsFinished
-    machine.lastProductsFinished = productsFinished
+    local delta = productsFinished - info.lastProductsFinished
+    info.lastProductsFinished = productsFinished
     if status == nil then
         status = self:getStatus(entity)
     end
@@ -537,45 +564,31 @@ function MachineProductionDataCollector.prototype.updateEntity(self, entity, uni
         status or self:getStatus(entity)
     }
 end
-function MachineProductionDataCollector.prototype.on_built_entity(self, event)
-    self:onBuilt(event.created_entity)
+function MachineProduction.prototype.onDeleted(self, entity, event)
+    self:tryUpdateEntity(entity, event.name == defines.events.on_entity_died and "entity-died" or "mined")
 end
-function MachineProductionDataCollector.prototype.on_robot_built_entity(self, event)
-    self:onBuilt(event.created_entity)
-end
-function MachineProductionDataCollector.prototype.on_pre_player_mined_item(self, event)
-    self:tryUpdateEntity(event.entity, "mined")
-end
-function MachineProductionDataCollector.prototype.on_robot_pre_mined(self, event)
-    self:tryUpdateEntity(event.entity, "mined")
-end
-function MachineProductionDataCollector.prototype.on_entity_died(self, event)
-    self:tryUpdateEntity(event.entity, "entity-died")
-end
-function MachineProductionDataCollector.prototype.on_marked_for_deconstruction(self, event)
+function MachineProduction.prototype.on_marked_for_deconstruction(self, event)
     self:tryUpdateEntity(event.entity)
 end
-function MachineProductionDataCollector.prototype.on_cancelled_deconstruction(self, event)
+function MachineProduction.prototype.on_cancelled_deconstruction(self, event)
     self:tryUpdateEntity(event.entity)
 end
-function MachineProductionDataCollector.prototype.on_gui_closed(self, event)
+function MachineProduction.prototype.on_gui_closed(self, event)
     local entity = event.entity
     if entity then
         self:tryUpdateEntity(entity, nil, true)
     end
 end
-function MachineProductionDataCollector.prototype.on_entity_settings_pasted(self, event)
+function MachineProduction.prototype.on_entity_settings_pasted(self, event)
     self:tryUpdateEntity(event.destination, nil, true)
 end
-function MachineProductionDataCollector.prototype.on_nth_tick(self)
-    for unitNumber, entity in pairs(self.trackedMachines) do
-        self:updateEntity(entity, unitNumber)
-    end
+function MachineProduction.prototype.onPeriodicUpdate(self, entity, data)
+    self:updateEntity(entity, data)
 end
-function MachineProductionDataCollector.prototype.exportData(self)
+function MachineProduction.prototype.exportData(self)
     local totalSize = 0
     local machines = {}
-    for ____, machine in pairs(self.machines) do
+    for ____, machine in pairs(self.entityData) do
         for ____, production in pairs(machine.byRecipe) do
             if #production.production > 0 then
                 machines[#machines + 1] = production
@@ -588,21 +601,165 @@ function MachineProductionDataCollector.prototype.exportData(self)
 end
 return ____exports
  end,
+["dataCollectors.buffer-amounts"] = function(...) 
+local ____lualib = require("lualib_bundle")
+local __TS__Class = ____lualib.__TS__Class
+local __TS__ClassExtends = ____lualib.__TS__ClassExtends
+local __TS__Delete = ____lualib.__TS__Delete
+local ____exports = {}
+local ____entity_2Dtracker = require("dataCollectors.entity-tracker")
+local EntityTracker = ____entity_2Dtracker.default
+____exports.default = __TS__Class()
+local BufferAmounts = ____exports.default
+BufferAmounts.name = "BufferAmounts"
+__TS__ClassExtends(BufferAmounts, EntityTracker)
+function BufferAmounts.prototype.____constructor(self, nth_tick_period, minDataPointsToDetermineItemType)
+    if nth_tick_period == nil then
+        nth_tick_period = 60 * 5
+    end
+    if minDataPointsToDetermineItemType == nil then
+        minDataPointsToDetermineItemType = 5
+    end
+    EntityTracker.prototype.____constructor(self, {filter = "type", type = "container"})
+    self.nth_tick_period = nth_tick_period
+    self.minDataPointsToDetermineItemType = minDataPointsToDetermineItemType
+end
+function BufferAmounts.prototype.initialData(self, entity)
+    if not entity.get_inventory(defines.inventory.chest) then
+        return nil
+    end
+    return {
+        name = entity.name,
+        unitNumber = entity.unit_number,
+        location = entity.position,
+        timeBuilt = game.tick,
+        itemCounts = {}
+    }
+end
+function BufferAmounts.prototype.getMaxKey(self, obj)
+    local maxKey
+    local max = 0
+    for key, value in pairs(obj) do
+        if value == max then
+            maxKey = nil
+        end
+        if value > max then
+            max = value
+            maxKey = key
+        end
+    end
+    return maxKey
+end
+function BufferAmounts.prototype.onPeriodicUpdate(self, entity, data)
+    local amounts = data.amounts
+    if amounts then
+        local itemCount = entity.get_inventory(defines.inventory.chest).get_item_count(assert(data.item))
+        amounts[#amounts + 1] = {game.tick, itemCount}
+    else
+        local itemCounts = assert(data.itemCounts)
+        local counts = entity.get_inventory(defines.inventory.chest).get_contents()
+        if (next(counts)) == nil then
+            return
+        end
+        itemCounts[#itemCounts + 1] = {time = game.tick, counts = counts}
+        if #itemCounts == self.minDataPointsToDetermineItemType then
+            self:determineItemType(data)
+        end
+        return
+    end
+end
+function BufferAmounts.prototype.determineItemType(self, data)
+    local maxAtTime = {}
+    local itemCounts = data.itemCounts
+    for ____, ____value in ipairs(itemCounts) do
+        local counts = ____value.counts
+        local maxKey = self:getMaxKey(counts)
+        if maxKey then
+            maxAtTime[maxKey] = (maxAtTime[maxKey] or 0) + 1
+        end
+    end
+    local finalMax = self:getMaxKey(maxAtTime)
+    if not (finalMax and maxAtTime[finalMax] > self.minDataPointsToDetermineItemType / 2) then
+        self:removeEntry(data.unitNumber)
+        return
+    end
+    data.item = finalMax
+    data.amounts = {}
+    for ____, ____value in ipairs(itemCounts) do
+        local time = ____value.time
+        local counts = ____value.counts
+        local ____data_amounts_0 = data.amounts
+        ____data_amounts_0[#____data_amounts_0 + 1] = {time, counts[finalMax] or 0}
+    end
+    __TS__Delete(data, "itemCounts")
+end
+function BufferAmounts.prototype.exportData(self)
+    local buffers = {}
+    for unitNumber, entity in pairs(self.trackedEntities) do
+        do
+            local data = self:getEntityData(entity, unitNumber)
+            local amounts = data and data.amounts
+            if not amounts or not amounts[1] then
+                goto __continue22
+            end
+            local remove = table.remove
+            while amounts[#amounts][2] == 0 do
+                remove(amounts)
+            end
+            if not amounts[1] then
+                goto __continue22
+            end
+            buffers[#buffers + 1] = {
+                name = data.name,
+                unitNumber = data.unitNumber,
+                location = data.location,
+                timeBuilt = data.timeBuilt,
+                item = data.item,
+                amounts = amounts
+            }
+        end
+        ::__continue22::
+    end
+    return {period = self.nth_tick_period, buffers = buffers}
+end
+return ____exports
+ end,
+["dataCollectors.rocket-launch-time"] = function(...) 
+local ____lualib = require("lualib_bundle")
+local __TS__Class = ____lualib.__TS__Class
+local ____exports = {}
+____exports.default = __TS__Class()
+local RocketLaunchTime = ____exports.default
+RocketLaunchTime.name = "RocketLaunchTime"
+function RocketLaunchTime.prototype.____constructor(self)
+    self.launchTimes = {}
+end
+function RocketLaunchTime.prototype.on_rocket_launched(self, event)
+    local ____self_launchTimes_0 = self.launchTimes
+    ____self_launchTimes_0[#____self_launchTimes_0 + 1] = event.tick
+end
+function RocketLaunchTime.prototype.exportData(self)
+    return {rocketLaunchTimes = self.launchTimes}
+end
+return ____exports
+ end,
 ["control"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__New = ____lualib.__TS__New
 local ____exports = {}
 local ____event_handler = require("event_handler")
 local add_lib = ____event_handler.add_lib
-local ____dataCollector = require("dataCollector")
-local addDataCollector = ____dataCollector.addDataCollector
-local exportAllDataCollectors = ____dataCollector.exportAllDataCollectors
 local ____player_2Dposition = require("dataCollectors.player-position")
 local PlayerPositions = ____player_2Dposition.default
-local ____silo_2Dlaunched = require("dataCollectors.silo-launched")
-local SiloLaunchTimes = ____silo_2Dlaunched.default
 local ____machine_2Dproduction = require("dataCollectors.machine-production")
-local MachineProductionDataCollector = ____machine_2Dproduction.default
+local MachineProduction = ____machine_2Dproduction.default
+local ____data_2Dcollector = require("data-collector")
+local addDataCollector = ____data_2Dcollector.addDataCollector
+local exportAllData = ____data_2Dcollector.exportAllData
+local ____buffer_2Damounts = require("dataCollectors.buffer-amounts")
+local BufferAmounts = ____buffer_2Damounts.default
+local ____rocket_2Dlaunch_2Dtime = require("dataCollectors.rocket-launch-time")
+local RocketLaunchTime = ____rocket_2Dlaunch_2Dtime.default
 local exportOnSiloLaunch = true
 addDataCollector(
     nil,
@@ -610,11 +767,7 @@ addDataCollector(
 )
 addDataCollector(
     nil,
-    __TS__New(SiloLaunchTimes)
-)
-addDataCollector(
-    nil,
-    __TS__New(MachineProductionDataCollector, {
+    __TS__New(MachineProduction, {
         "assembling-machine-1",
         "assembling-machine-2",
         "assembling-machine-3",
@@ -624,15 +777,23 @@ addDataCollector(
         "steel-furnace"
     })
 )
+addDataCollector(
+    nil,
+    __TS__New(BufferAmounts)
+)
+addDataCollector(
+    nil,
+    __TS__New(RocketLaunchTime)
+)
 if exportOnSiloLaunch then
-    add_lib({events = {[defines.events.on_rocket_launched] = function() return exportAllDataCollectors(nil) end}})
+    add_lib({events = {[defines.events.on_rocket_launched] = function() return exportAllData(nil) end}})
 end
 commands.add_command(
-    "export-dataCollector",
-    "Export current dataCollector data",
+    "export-replay-data",
+    "Export current collected replay data",
     function()
-        exportAllDataCollectors(nil)
-        game.print("Exported dataCollector data to script-output/dataCollector/*.json")
+        exportAllData(nil)
+        game.print("Exported data to script-output/replay-data/*.json")
     end
 )
 require("old-control")

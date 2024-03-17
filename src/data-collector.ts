@@ -94,7 +94,7 @@ function getOutFileName(s: string): string {
   return lowerCamelCase
 }
 
-export function exportAllDataCollectors(): void {
+export function exportAllData(): void {
   for (const [name, datum] of pairs(global.dataCollectors!)) {
     const outname = `replay-data/${getOutFileName(name)}.json`
     log(`Exporting ${name}`)
