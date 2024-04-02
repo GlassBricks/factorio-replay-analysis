@@ -231,16 +231,26 @@ local function __TS__SparseArraySpread(sparseArray)
     return _unpack(sparseArray, 1, sparseArray.sparseLength)
 end
 
+local function __TS__ArrayEvery(self, callbackfn, thisArg)
+    for i = 1, #self do
+        if not callbackfn(thisArg, self[i], i - 1, self) then
+            return false
+        end
+    end
+    return true
+end
+
 return {
   __TS__StringAccess = __TS__StringAccess,
   __TS__StringEndsWith = __TS__StringEndsWith,
   __TS__StringSlice = __TS__StringSlice,
   __TS__Class = __TS__Class,
   __TS__Delete = __TS__Delete,
-  __TS__ClassExtends = __TS__ClassExtends,
   __TS__SparseArrayNew = __TS__SparseArrayNew,
   __TS__SparseArrayPush = __TS__SparseArrayPush,
   __TS__SparseArraySpread = __TS__SparseArraySpread,
+  __TS__ClassExtends = __TS__ClassExtends,
+  __TS__ArrayEvery = __TS__ArrayEvery,
   __TS__New = __TS__New
 }
  end,
@@ -400,7 +410,7 @@ end
 function EntityTracker.prototype.on_robot_built_entity(self, event)
     self:onCreated(event.created_entity, event)
 end
-function EntityTracker.prototype.onDeleted(self, entity, event)
+function EntityTracker.prototype.onDeleted(self, entity, _event)
     local unitNumber = entity.unit_number
     if unitNumber then
         self:removeEntry(unitNumber)
@@ -445,14 +455,41 @@ return ____exports
  end,
 ["dataCollectors.machine-production"] = function(...) 
 local ____lualib = require("lualib_bundle")
-local __TS__Class = ____lualib.__TS__Class
-local __TS__ClassExtends = ____lualib.__TS__ClassExtends
 local __TS__SparseArrayNew = ____lualib.__TS__SparseArrayNew
 local __TS__SparseArrayPush = ____lualib.__TS__SparseArrayPush
 local __TS__SparseArraySpread = ____lualib.__TS__SparseArraySpread
+local __TS__Class = ____lualib.__TS__Class
+local __TS__ClassExtends = ____lualib.__TS__ClassExtends
+local __TS__ArrayEvery = ____lualib.__TS__ArrayEvery
 local ____exports = {}
 local ____entity_2Dtracker = require("dataCollectors.entity-tracker")
 local EntityTracker = ____entity_2Dtracker.default
+local stoppedStatuses = {disabled_by_script = true, marked_for_deconstruction = true, no_recipe = true}
+local function isStoppingStatus(self, status)
+    return stoppedStatuses[status] ~= nil
+end
+local commonStatuses = {
+    "working",
+    "normal",
+    "no_power",
+    "low_power",
+    "no_fuel",
+    "disabled_by_control_behavior",
+    "disabled_by_script",
+    "marked_for_deconstruction"
+}
+local ____array_0 = __TS__SparseArrayNew(table.unpack(commonStatuses))
+__TS__SparseArrayPush(
+    ____array_0,
+    "no_recipe",
+    "fluid_ingredient_shortage",
+    "full_output",
+    "item_ingredient_shortage"
+)
+local craftingMachineStatuses = {__TS__SparseArraySpread(____array_0)}
+local ____array_1 = __TS__SparseArrayNew(table.unpack(commonStatuses))
+__TS__SparseArrayPush(____array_1, "no_ingredients")
+local furnaceStatuses = {__TS__SparseArraySpread(____array_1)}
 ____exports.default = __TS__Class()
 local MachineProduction = ____exports.default
 MachineProduction.name = "MachineProduction"
@@ -472,29 +509,7 @@ function MachineProduction.prototype.on_init(self)
     end
 end
 function MachineProduction.prototype.getStatus(self, entity)
-    local commonKeys = {
-        "working",
-        "normal",
-        "no_power",
-        "low_power",
-        "no_fuel",
-        "disabled_by_control_behavior",
-        "disabled_by_script",
-        "marked_for_deconstruction"
-    }
-    local ____array_0 = __TS__SparseArrayNew(table.unpack(commonKeys))
-    __TS__SparseArrayPush(
-        ____array_0,
-        "no_recipe",
-        "fluid_ingredient_shortage",
-        "full_output",
-        "item_ingredient_shortage"
-    )
-    local craftingMachineKeys = {__TS__SparseArraySpread(____array_0)}
-    local ____array_1 = __TS__SparseArrayNew(table.unpack(commonKeys))
-    __TS__SparseArrayPush(____array_1, "no_ingredients")
-    local furnaceKeys = {__TS__SparseArraySpread(____array_1)}
-    local keys = (entity.type == "assembling-machine" or entity.type == "rocket-silo") and craftingMachineKeys or (entity.type == "furnace" and furnaceKeys or error("Invalid entity type"))
+    local keys = (entity.type == "assembling-machine" or entity.type == "rocket-silo") and craftingMachineStatuses or (entity.type == "furnace" and furnaceStatuses or error("Invalid entity type"))
     local status = entity.status
     for ____, key in ipairs(keys) do
         if defines.entity_status[key] == status then
@@ -507,96 +522,135 @@ function MachineProduction.prototype.getStatus(self, entity)
     end
     return "unknown"
 end
-function MachineProduction.prototype.initialData(self)
-    return {byRecipe = {}, timeBuilt = game.tick, lastProductsFinished = 0}
+function MachineProduction.prototype.initialData(self, entity)
+    return {
+        name = entity.name,
+        unitNumber = entity.unit_number,
+        location = entity.position,
+        timeBuilt = game.tick,
+        lastProductsFinished = 0,
+        lastRecipe = nil,
+        recipeProduction = {}
+    }
 end
-function MachineProduction.prototype.tryUpdateEntity(self, entity, status, onlyIfRecipeChanged)
-    if onlyIfRecipeChanged == nil then
-        onlyIfRecipeChanged = false
-    end
-    local info = self:getEntityData(entity)
-    if info then
-        self:updateEntity(entity, info, status, onlyIfRecipeChanged)
+function MachineProduction.prototype.addDataPoint(self, entity, info, status)
+    local tick = game.tick
+    local recipeProduction = info.recipeProduction
+    local currentProduction = recipeProduction[#recipeProduction]
+    local lastEntry = currentProduction.production[#currentProduction.production]
+    if lastEntry == nil or lastEntry[1] ~= tick then
+        local productsFinished = entity.products_finished
+        local delta = productsFinished - info.lastProductsFinished
+        info.lastProductsFinished = productsFinished
+        local ____currentProduction_production_2 = currentProduction.production
+        ____currentProduction_production_2[#____currentProduction_production_2 + 1] = {tick, delta, status}
     end
 end
-function MachineProduction.prototype.updateEntity(self, entity, info, status, onlyIfRecipeChanged)
-    if onlyIfRecipeChanged == nil then
-        onlyIfRecipeChanged = false
-    end
-    local ____opt_2 = entity.get_recipe()
-    local recipe = ____opt_2 and ____opt_2.name
-    local lastRecipe = info.lastRecipe
-    local recipeChanged = recipe ~= lastRecipe
-    if recipeChanged and lastRecipe then
-        local lastEntry = info.byRecipe[lastRecipe]
-        if lastEntry ~= nil then
-            local ____lastEntry_production_4 = lastEntry.production
-            ____lastEntry_production_4[#____lastEntry_production_4 + 1] = {game.tick, entity.products_finished - info.lastProductsFinished, "recipe-changed"}
-        end
-        info.lastProductsFinished = entity.products_finished
-    end
-    info.lastRecipe = recipe
-    if not recipe or onlyIfRecipeChanged and not recipeChanged then
+function MachineProduction.prototype.markProductionFinished(self, entity, info, status, reason)
+    local recipeProduction = info.recipeProduction
+    local lastProduction = recipeProduction[#recipeProduction]
+    if lastProduction == nil then
         return
     end
-    if not info.byRecipe[recipe] then
-        info.byRecipe[recipe] = {
-            name = entity.name,
-            recipe = recipe,
-            unitNumber = entity.unit_number,
-            location = entity.position,
-            timeBuilt = info.timeBuilt,
-            timeStarted = game.tick,
-            production = {}
-        }
+    self:addDataPoint(entity, info, status)
+    local production = lastProduction.production
+    if #production == 0 or __TS__ArrayEvery(
+        production,
+        function(____, ____bindingPattern0)
+            local delta
+            delta = ____bindingPattern0[2]
+            return delta == 0
+        end
+    ) then
+        table.remove(recipeProduction)
+        return
     end
-    local entry = info.byRecipe[recipe]
-    local productsFinished = entity.products_finished
-    local delta = productsFinished - info.lastProductsFinished
-    info.lastProductsFinished = productsFinished
+    lastProduction.timeStopped = game.tick
+    lastProduction.stoppedReason = reason
+end
+function MachineProduction.prototype.startNewProduction(self, info, recipe)
+    local ____info_recipeProduction_3 = info.recipeProduction
+    ____info_recipeProduction_3[#____info_recipeProduction_3 + 1] = {recipe = recipe, timeStarted = game.tick, production = {}}
+end
+function MachineProduction.prototype.tryCheckRunningChanged(self, entity, knownStopReason)
+    local info = self:getEntityData(entity)
+    if info then
+        self:checkRunningChanged(entity, info, nil, knownStopReason)
+    end
+end
+function MachineProduction.prototype.checkRunningChanged(self, entity, info, status, knownStopReason)
+    local ____opt_4 = entity.get_recipe()
+    local recipe = ____opt_4 and ____opt_4.name
+    local lastRecipe = info.lastRecipe
+    if not recipe and entity.type == "furnace" then
+        recipe = lastRecipe
+    end
+    info.lastRecipe = recipe
+    local recipeChanged = recipe ~= lastRecipe
     if status == nil then
         status = self:getStatus(entity)
     end
-    local ____entry_production_5 = entry.production
-    ____entry_production_5[#____entry_production_5 + 1] = {
-        game.tick,
-        delta,
-        status or self:getStatus(entity)
-    }
+    local isStopped = knownStopReason ~= nil or isStoppingStatus(nil, status)
+    local updated = false
+    if lastRecipe then
+        if recipeChanged or status == "no_recipe" then
+            self:markProductionFinished(entity, info, status, "recipe_changed")
+            updated = true
+        elseif isStopped then
+            self:markProductionFinished(entity, info, status, knownStopReason or status)
+            updated = true
+        end
+    end
+    if recipe and recipeChanged then
+        self:startNewProduction(info, recipe)
+        updated = true
+    end
+    return updated, not isStopped and recipe ~= nil
 end
 function MachineProduction.prototype.onDeleted(self, entity, event)
-    self:tryUpdateEntity(entity, event.name == defines.events.on_entity_died and "entity-died" or "mined")
+    self:tryCheckRunningChanged(entity, event.name == defines.events.on_entity_died and "entity_died" or "mined")
+    EntityTracker.prototype.onDeleted(self, entity, event)
 end
 function MachineProduction.prototype.on_marked_for_deconstruction(self, event)
-    self:tryUpdateEntity(event.entity)
+    self:tryCheckRunningChanged(event.entity, "marked_for_deconstruction")
 end
 function MachineProduction.prototype.on_cancelled_deconstruction(self, event)
-    self:tryUpdateEntity(event.entity)
+    self:tryCheckRunningChanged(event.entity, nil)
 end
 function MachineProduction.prototype.on_gui_closed(self, event)
-    local entity = event.entity
-    if entity then
-        self:tryUpdateEntity(entity, nil, true)
+    if event.entity then
+        self:tryCheckRunningChanged(event.entity, nil)
     end
 end
 function MachineProduction.prototype.on_entity_settings_pasted(self, event)
-    self:tryUpdateEntity(event.destination, nil, true)
+    self:tryCheckRunningChanged(event.destination, nil)
 end
 function MachineProduction.prototype.onPeriodicUpdate(self, entity, data)
-    self:updateEntity(entity, data)
+    local status = self:getStatus(entity)
+    local updated, isRunning = self:checkRunningChanged(entity, data, status, nil)
+    local shouldAddDataPoint = not updated and isRunning
+    if shouldAddDataPoint then
+        self:addDataPoint(entity, data, status)
+    end
 end
 function MachineProduction.prototype.exportData(self)
-    local totalSize = 0
     local machines = {}
     for ____, machine in pairs(self.entityData) do
-        for ____, production in pairs(machine.byRecipe) do
-            if #production.production > 0 then
-                machines[#machines + 1] = production
-                totalSize = totalSize + #production.production
+        do
+            local recipes = machine.recipeProduction
+            if #recipes == 0 then
+                goto __continue37
             end
+            machines[#machines + 1] = {
+                name = machine.name,
+                unitNumber = machine.unitNumber,
+                location = machine.location,
+                timeBuilt = machine.timeBuilt,
+                recipes = recipes
+            }
         end
+        ::__continue37::
     end
-    log("Total size: " .. tostring(totalSize))
     return {period = self.nth_tick_period, machines = machines}
 end
 return ____exports
@@ -743,6 +797,45 @@ function RocketLaunchTime.prototype.exportData(self)
 end
 return ____exports
  end,
+["dataCollectors.player-inventory"] = function(...) 
+local ____lualib = require("lualib_bundle")
+local __TS__Class = ____lualib.__TS__Class
+local ____exports = {}
+____exports.default = __TS__Class()
+local PlayerInventory = ____exports.default
+PlayerInventory.name = "PlayerInventory"
+function PlayerInventory.prototype.____constructor(self, nth_tick_period)
+    if nth_tick_period == nil then
+        nth_tick_period = 60
+    end
+    self.nth_tick_period = nth_tick_period
+    self.players = {}
+end
+function PlayerInventory.prototype.on_nth_tick(self, event)
+    for ____, player in pairs(game.players) do
+        local name = player.name
+        if not self.players[name] then
+            self.players[name] = {}
+            do
+                local i = 0
+                while i < event.tick do
+                    local ____self_players_name_0 = self.players[name]
+                    ____self_players_name_0[#____self_players_name_0 + 1] = {}
+                    i = i + self.nth_tick_period
+                end
+            end
+        end
+        local ____opt_1 = player.get_main_inventory()
+        local contents = ____opt_1 and ____opt_1.get_contents() or ({})
+        local ____self_players_name_3 = self.players[name]
+        ____self_players_name_3[#____self_players_name_3 + 1] = contents
+    end
+end
+function PlayerInventory.prototype.exportData(self)
+    return {period = self.nth_tick_period, players = self.players}
+end
+return ____exports
+ end,
 ["control"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__New = ____lualib.__TS__New
@@ -750,7 +843,7 @@ local ____exports = {}
 local ____event_handler = require("event_handler")
 local add_lib = ____event_handler.add_lib
 local ____player_2Dposition = require("dataCollectors.player-position")
-local PlayerPositions = ____player_2Dposition.default
+local PlayerPosition = ____player_2Dposition.default
 local ____machine_2Dproduction = require("dataCollectors.machine-production")
 local MachineProduction = ____machine_2Dproduction.default
 local ____data_2Dcollector = require("data-collector")
@@ -760,10 +853,16 @@ local ____buffer_2Damounts = require("dataCollectors.buffer-amounts")
 local BufferAmounts = ____buffer_2Damounts.default
 local ____rocket_2Dlaunch_2Dtime = require("dataCollectors.rocket-launch-time")
 local RocketLaunchTime = ____rocket_2Dlaunch_2Dtime.default
+local ____player_2Dinventory = require("dataCollectors.player-inventory")
+local PlayerInventory = ____player_2Dinventory.default
 local exportOnSiloLaunch = true
 addDataCollector(
     nil,
-    __TS__New(PlayerPositions)
+    __TS__New(PlayerPosition)
+)
+addDataCollector(
+    nil,
+    __TS__New(PlayerInventory)
 )
 addDataCollector(
     nil,
