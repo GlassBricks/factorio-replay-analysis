@@ -11,7 +11,7 @@ interface PlayerInventoryData {
 }
 
 export default class PlayerInventory implements DataCollector<PlayerInventoryData> {
-  constructor(public nth_tick_period: number = 60) {}
+  constructor(public nth_tick_period: number = 360) {}
 
   players: Record<string, Record<string, number>[]> = {}
 

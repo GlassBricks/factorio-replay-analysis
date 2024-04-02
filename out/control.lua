@@ -806,7 +806,7 @@ local PlayerInventory = ____exports.default
 PlayerInventory.name = "PlayerInventory"
 function PlayerInventory.prototype.____constructor(self, nth_tick_period)
     if nth_tick_period == nil then
-        nth_tick_period = 60
+        nth_tick_period = 360
     end
     self.nth_tick_period = nth_tick_period
     self.players = {}
