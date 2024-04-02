@@ -1,14 +1,16 @@
 import { add_lib } from "event_handler"
-import PlayerPositions from "./dataCollectors/player-position"
+import PlayerPosition from "./dataCollectors/player-position"
 import MachineProduction from "./dataCollectors/machine-production"
 import { addDataCollector, exportAllData } from "./data-collector"
 import BufferAmounts from "./dataCollectors/buffer-amounts"
 import RocketLaunchTime from "./dataCollectors/rocket-launch-time"
+import PlayerInventory from "./dataCollectors/player-inventory"
 
 const exportOnSiloLaunch = true
 
-// datums
-addDataCollector(new PlayerPositions())
+// data collectors
+addDataCollector(new PlayerPosition())
+addDataCollector(new PlayerInventory())
 addDataCollector(
   new MachineProduction([
     "assembling-machine-1",
@@ -21,8 +23,8 @@ addDataCollector(
   ]),
 )
 addDataCollector(new BufferAmounts())
-
 addDataCollector(new RocketLaunchTime())
+
 // options
 if (exportOnSiloLaunch) {
   add_lib({
