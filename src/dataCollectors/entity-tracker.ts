@@ -49,7 +49,8 @@ export default abstract class EntityTracker<T> {
     this.onCreated(event.created_entity, event)
   }
 
-  protected onDeleted(entity: LuaEntity, event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent) {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  protected onDeleted(entity: LuaEntity, _event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent) {
     const unitNumber = entity.unit_number
     if (unitNumber) {
       this.removeEntry(unitNumber)

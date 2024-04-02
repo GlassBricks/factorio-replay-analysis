@@ -7,38 +7,81 @@ import {
   OnMarkedForDeconstructionEvent,
   OnPrePlayerMinedItemEvent,
   OnRobotPreMinedEvent,
+  UnitNumber,
 } from "factorio:runtime"
 import EntityTracker from "./entity-tracker"
 import { DataCollector } from "../data-collector"
 
-type EntityStatus = keyof typeof defines.entity_status | "recipe-changed" | "unknown" | "mined" | "entity-died"
-
-interface SingleMachineData {
-  name: string
-  recipe: string
-  unitNumber: number
-  location: MapPosition
-  timeBuilt: number
-  timeStarted: number
-  production: [time: number, productsFinished: number, status: EntityStatus][]
-}
+type EntityStatus = keyof typeof defines.entity_status | "unknown"
 
 interface MachineProductionData {
   period: number
-  machines: SingleMachineData[]
+  machines: MachineData[]
+}
+
+interface MachineData {
+  name: string
+  unitNumber: number
+  location: MapPosition
+  timeBuilt: number
+  recipes: MachineRecipeProduction[]
+}
+
+type StopReason = "recipe_changed" | "mined" | "entity_died" | "marked_for_deconstruction" | "disabled_by_script"
+
+interface MachineRecipeProduction {
+  recipe: string
+  timeStarted: number
+  timeStopped?: number
+  stoppedReason?: StopReason
+  production: [time: number, productsFinished: number, status: EntityStatus][]
+}
+
+const stoppedStatuses = {
+  disabled_by_script: true,
+  marked_for_deconstruction: true,
+  no_recipe: true,
+} as const
+
+function isStoppingStatus(
+  status: EntityStatus,
+): status is "disabled_by_script" | "marked_for_deconstruction" | "no_recipe" {
+  return status in stoppedStatuses
 }
 
 // assemblers, chem plants, refineries, furnaces
 
-interface TrackedMachineInfo {
-  byRecipe: Record<string, SingleMachineData>
+const commonStatuses = [
+  "working",
+  "normal",
+  "no_power",
+  "low_power",
+  "no_fuel",
+  "disabled_by_control_behavior",
+  "disabled_by_script",
+  "marked_for_deconstruction",
+] satisfies (keyof typeof defines.entity_status)[]
+const craftingMachineStatuses: (keyof typeof defines.entity_status)[] = [
+  ...commonStatuses,
+  "no_recipe",
+  "fluid_ingredient_shortage",
+  "full_output",
+  "item_ingredient_shortage",
+]
+const furnaceStatuses: (keyof typeof defines.entity_status)[] = [...commonStatuses, "no_ingredients"]
+
+interface TrackedMachineData {
+  name: string
+  unitNumber: UnitNumber
+  location: MapPosition
   timeBuilt: number
   lastProductsFinished: number
-  lastRecipe?: string
+  lastRecipe: string | undefined
+  recipeProduction: MachineRecipeProduction[]
 }
 
 export default class MachineProduction
-  extends EntityTracker<TrackedMachineInfo>
+  extends EntityTracker<TrackedMachineData>
   implements DataCollector<MachineProductionData>
 {
   constructor(
@@ -62,30 +105,12 @@ export default class MachineProduction
     }
   }
 
-  private getStatus(entity: LuaEntity) {
-    const commonKeys = [
-      "working",
-      "normal",
-      "no_power",
-      "low_power",
-      "no_fuel",
-      "disabled_by_control_behavior",
-      "disabled_by_script",
-      "marked_for_deconstruction",
-    ] satisfies (keyof typeof defines.entity_status)[]
-    const craftingMachineKeys: (keyof typeof defines.entity_status)[] = [
-      ...commonKeys,
-      "no_recipe",
-      "fluid_ingredient_shortage",
-      "full_output",
-      "item_ingredient_shortage",
-    ]
-    const furnaceKeys: (keyof typeof defines.entity_status)[] = [...commonKeys, "no_ingredients"]
+  private getStatus(entity: LuaEntity): EntityStatus {
     const keys =
       entity.type == "assembling-machine" || entity.type == "rocket-silo"
-        ? craftingMachineKeys
+        ? craftingMachineStatuses
         : entity.type == "furnace"
-          ? furnaceKeys
+          ? furnaceStatuses
           : error("Invalid entity type")
 
     const status = entity.status
@@ -101,103 +126,147 @@ export default class MachineProduction
     return "unknown"
   }
 
-  override initialData(): TrackedMachineInfo {
+  override initialData(entity: LuaEntity): TrackedMachineData {
     return {
-      byRecipe: {},
+      name: entity.name,
+      unitNumber: entity.unit_number!,
+      location: entity.position,
       timeBuilt: game.tick,
       lastProductsFinished: 0,
+      lastRecipe: undefined,
+      recipeProduction: [],
     }
   }
 
-  private tryUpdateEntity(entity: LuaEntity, status?: EntityStatus, onlyIfRecipeChanged: boolean = false) {
-    const info = this.getEntityData(entity)
-    if (info) {
-      this.updateEntity(entity, info, status, onlyIfRecipeChanged)
+  private addDataPoint(entity: LuaEntity, info: TrackedMachineData, status: EntityStatus) {
+    const tick = game.tick
+    const recipeProduction = info.recipeProduction
+    const currentProduction = recipeProduction[recipeProduction.length - 1]
+    const lastEntry = currentProduction.production[currentProduction.production.length - 1]
+    if (lastEntry == undefined || lastEntry[0] != tick) {
+      const productsFinished = entity.products_finished
+      const delta = productsFinished - info.lastProductsFinished
+      info.lastProductsFinished = productsFinished
+      currentProduction.production.push([tick, delta, status])
     }
   }
 
-  updateEntity(
+  private markProductionFinished(
     entity: LuaEntity,
-    info: TrackedMachineInfo,
-    status?: EntityStatus,
-    onlyIfRecipeChanged: boolean = false,
+    info: TrackedMachineData,
+    status: EntityStatus,
+    reason: StopReason,
   ) {
-    // log(`trying to update entity ${entity.name} ${entity.unit_number} ${entity.position.x} ${entity.position.y}`)
-    const recipe = entity.get_recipe()?.name
-    const lastRecipe = info.lastRecipe
-    const recipeChanged = recipe != lastRecipe
-    if (recipeChanged && lastRecipe) {
-      const lastEntry = info.byRecipe[lastRecipe]
-      if (lastEntry != undefined) {
-        lastEntry.production.push([game.tick, entity.products_finished - info.lastProductsFinished, "recipe-changed"])
-      }
-
-      info.lastProductsFinished = entity.products_finished
-    }
-    info.lastRecipe = recipe
-
-    if (!recipe || (onlyIfRecipeChanged && !recipeChanged)) {
+    const recipeProduction = info.recipeProduction
+    const lastProduction = recipeProduction[recipeProduction.length - 1]
+    if (lastProduction == undefined) return
+    this.addDataPoint(entity, info, status)
+    const production = lastProduction.production
+    if (production.length === 0 || production.every(([, delta]) => delta == 0)) {
+      recipeProduction.pop()
       return
     }
-    if (!info.byRecipe[recipe]) {
-      info.byRecipe[recipe] = {
-        name: entity.name,
-        recipe,
-        unitNumber: entity.unit_number!,
-        location: entity.position,
-        timeBuilt: info.timeBuilt,
-        timeStarted: game.tick,
-        production: [],
+    lastProduction.timeStopped = game.tick
+    lastProduction.stoppedReason = reason
+  }
+
+  private startNewProduction(info: TrackedMachineData, recipe: string) {
+    info.recipeProduction.push({
+      recipe,
+      timeStarted: game.tick,
+      production: [],
+    })
+  }
+
+  private tryCheckRunningChanged(entity: LuaEntity, knownStopReason?: StopReason) {
+    const info = this.getEntityData(entity)
+    if (info) {
+      this.checkRunningChanged(entity, info, undefined, knownStopReason)
+    }
+  }
+
+  /**
+   * checks if stopped, recipe changed, or newly started
+   */
+  private checkRunningChanged(
+    entity: LuaEntity,
+    info: TrackedMachineData,
+    status: EntityStatus | undefined,
+    knownStopReason: StopReason | undefined,
+  ): LuaMultiReturn<[updated: boolean, isRunning: boolean]> {
+    let recipe = entity.get_recipe()?.name
+    const lastRecipe = info.lastRecipe
+    if (!recipe && entity.type == "furnace") {
+      // furnaces without ingredients show up as no recipe; we instead want to keep the last recipe
+      recipe = lastRecipe
+    }
+    info.lastRecipe = recipe
+    const recipeChanged = recipe != lastRecipe
+    status ??= this.getStatus(entity)
+    const isStopped = knownStopReason != undefined || isStoppingStatus(status)
+    let updated = false
+    if (lastRecipe) {
+      if (recipeChanged || status == "no_recipe") {
+        this.markProductionFinished(entity, info, status, "recipe_changed")
+        updated = true
+      } else if (isStopped) {
+        this.markProductionFinished(entity, info, status, knownStopReason ?? (status as StopReason))
+        updated = true
       }
     }
-    const entry = info.byRecipe[recipe]
-    const productsFinished = entity.products_finished
-    const delta = productsFinished - info.lastProductsFinished
-    info.lastProductsFinished = productsFinished
-    status ??= this.getStatus(entity)
-    entry.production.push([game.tick, delta, status ?? this.getStatus(entity)])
+    if (recipe && recipeChanged) {
+      this.startNewProduction(info, recipe)
+      updated = true
+    }
+    return $multi(updated, !isStopped && recipe != undefined)
   }
 
   protected override onDeleted(
     entity: LuaEntity,
     event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent,
   ) {
-    this.tryUpdateEntity(entity, event.name == defines.events.on_entity_died ? "entity-died" : "mined")
+    this.tryCheckRunningChanged(entity, event.name == defines.events.on_entity_died ? "entity_died" : "mined")
+    super.onDeleted(entity, event)
   }
 
   on_marked_for_deconstruction(event: OnMarkedForDeconstructionEvent) {
-    this.tryUpdateEntity(event.entity)
+    this.tryCheckRunningChanged(event.entity, "marked_for_deconstruction")
   }
 
   on_cancelled_deconstruction(event: OnMarkedForDeconstructionEvent) {
-    this.tryUpdateEntity(event.entity)
+    this.tryCheckRunningChanged(event.entity, undefined)
   }
 
   on_gui_closed(event: OnGuiClosedEvent) {
-    const entity = event.entity
-    if (entity) this.tryUpdateEntity(entity, undefined, true)
+    if (event.entity) this.tryCheckRunningChanged(event.entity, undefined)
   }
 
   on_entity_settings_pasted(event: OnEntitySettingsPastedEvent) {
-    this.tryUpdateEntity(event.destination, undefined, true)
+    this.tryCheckRunningChanged(event.destination, undefined)
   }
 
-  protected override onPeriodicUpdate(entity: LuaEntity, data: TrackedMachineInfo) {
-    this.updateEntity(entity, data)
+  override onPeriodicUpdate(entity: LuaEntity, data: TrackedMachineData) {
+    const status = this.getStatus(entity)
+    const [updated, isRunning] = this.checkRunningChanged(entity, data, status, undefined)
+    const shouldAddDataPoint = !updated && isRunning
+    if (shouldAddDataPoint) {
+      this.addDataPoint(entity, data, status)
+    }
   }
 
   exportData(): MachineProductionData {
-    let totalSize = 0
-    const machines: SingleMachineData[] = []
+    const machines: MachineData[] = []
     for (const [, machine] of pairs(this.entityData)) {
-      for (const [, production] of pairs(machine.byRecipe)) {
-        if (production.production.length > 0) {
-          machines.push(production)
-          totalSize += production.production.length
-        }
-      }
+      const recipes = machine.recipeProduction
+      if (recipes.length == 0) continue
+      machines.push({
+        name: machine.name,
+        unitNumber: machine.unitNumber,
+        location: machine.location,
+        timeBuilt: machine.timeBuilt,
+        recipes,
+      })
     }
-    log("Total size: " + totalSize)
     return {
       period: this.nth_tick_period,
       machines,
