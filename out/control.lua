@@ -836,6 +836,48 @@ function PlayerInventory.prototype.exportData(self)
 end
 return ____exports
  end,
+["dataCollectors.research-timing"] = function(...) 
+local ____lualib = require("lualib_bundle")
+local __TS__Class = ____lualib.__TS__Class
+local ____exports = {}
+____exports.default = __TS__Class()
+local ResearchTiming = ____exports.default
+ResearchTiming.name = "ResearchTiming"
+function ResearchTiming.prototype.____constructor(self)
+    self.data = {timeFirstStarted = {}, timeCompleted = {}, events = {}}
+end
+function ResearchTiming.prototype.on_research_started(self, event)
+    local research = event.research.name
+    local time = event.tick
+    local ____self_data_timeFirstStarted_0, ____research_1 = self.data.timeFirstStarted, research
+    if ____self_data_timeFirstStarted_0[____research_1] == nil then
+        ____self_data_timeFirstStarted_0[____research_1] = time
+    end
+    local ____self_data_events_2 = self.data.events
+    ____self_data_events_2[#____self_data_events_2 + 1] = {time = time, research = research, type = "started"}
+end
+function ResearchTiming.prototype.on_research_cancelled(self, event)
+    local time = event.tick
+    for research in pairs(event.research) do
+        local ____self_data_events_3 = self.data.events
+        ____self_data_events_3[#____self_data_events_3 + 1] = {time = time, research = research, type = "cancelled"}
+    end
+end
+function ResearchTiming.prototype.on_research_finished(self, event)
+    local research = event.research.name
+    local time = event.tick
+    local ____self_data_timeCompleted_4, ____research_5 = self.data.timeCompleted, research
+    if ____self_data_timeCompleted_4[____research_5] == nil then
+        ____self_data_timeCompleted_4[____research_5] = time
+    end
+    local ____self_data_events_6 = self.data.events
+    ____self_data_events_6[#____self_data_events_6 + 1] = {time = time, research = research, type = "completed"}
+end
+function ResearchTiming.prototype.exportData(self)
+    return self.data
+end
+return ____exports
+ end,
 ["control"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__New = ____lualib.__TS__New
@@ -855,6 +897,8 @@ local ____rocket_2Dlaunch_2Dtime = require("dataCollectors.rocket-launch-time")
 local RocketLaunchTime = ____rocket_2Dlaunch_2Dtime.default
 local ____player_2Dinventory = require("dataCollectors.player-inventory")
 local PlayerInventory = ____player_2Dinventory.default
+local ____research_2Dtiming = require("dataCollectors.research-timing")
+local ResearchTiming = ____research_2Dtiming.default
 local exportOnSiloLaunch = true
 addDataCollector(
     nil,
@@ -879,6 +923,10 @@ addDataCollector(
 addDataCollector(
     nil,
     __TS__New(BufferAmounts)
+)
+addDataCollector(
+    nil,
+    __TS__New(ResearchTiming)
 )
 addDataCollector(
     nil,
