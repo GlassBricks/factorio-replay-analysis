@@ -214,7 +214,7 @@ export default class MachineProduction
         updated = true
       }
     }
-    if (recipe && recipeChanged) {
+    if (recipe && (recipeChanged || info.recipeProduction.length == 0)) {
       this.startNewProduction(info, recipe)
       updated = true
     }
