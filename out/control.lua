@@ -601,7 +601,7 @@ function MachineProduction.prototype.checkRunningChanged(self, entity, info, sta
             updated = true
         end
     end
-    if recipe and recipeChanged then
+    if recipe and (recipeChanged or #info.recipeProduction == 0) then
         self:startNewProduction(info, recipe)
         updated = true
     end
