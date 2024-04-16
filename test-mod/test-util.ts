@@ -61,12 +61,12 @@ setEventHandler(defines.events.on_tick)
 export function addHandlerForTest<K extends defines.events>(event: K, handler: (event: K["_eventData"]) => void): void {
   useFakeTime()
   ;(handlers[event] ??= new LuaSet()).add(handler as any)
-  after_test(() => {
-    handlers[event]?.delete(handler as any)
-  })
   if (script.get_event_handler(event) === nil) {
     setEventHandler(event)
   }
+  after_test(() => {
+    handlers[event]?.delete(handler as any)
+  })
 }
 
 export function addNthTickHandlerForTest(period: number, handler: (event: NthTickEventData) => void): void {

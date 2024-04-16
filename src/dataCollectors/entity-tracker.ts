@@ -7,10 +7,12 @@ import {
   OnPrePlayerMinedItemEvent,
   OnRobotBuiltEntityEvent,
   OnRobotPreMinedEvent,
+  ScriptRaisedBuiltEvent,
   UnitNumber,
 } from "factorio:runtime"
+import { EventHandlers } from "../data-collector"
 
-export default abstract class EntityTracker<T> {
+export default abstract class EntityTracker<T> implements EventHandlers {
   protected prototypes = new LuaSet<string>()
 
   private prototypeFilters?: EntityPrototypeFilterWrite[]
@@ -29,7 +31,7 @@ export default abstract class EntityTracker<T> {
   trackedEntities: Record<UnitNumber, LuaEntity> = {}
   entityData: { [unitNumber: number]: T } = {}
 
-  protected onCreated(entity: LuaEntity, event: OnBuiltEntityEvent | OnRobotBuiltEntityEvent) {
+  protected onCreated(entity: LuaEntity, event: OnBuiltEntityEvent | OnRobotBuiltEntityEvent | ScriptRaisedBuiltEvent) {
     const unitNumber = entity.unit_number
     if (unitNumber && this.prototypes.has(entity.name)) {
       const data = this.initialData(entity, event)
@@ -40,7 +42,14 @@ export default abstract class EntityTracker<T> {
     }
   }
 
-  protected abstract initialData(entity: LuaEntity, event: OnBuiltEntityEvent | OnRobotBuiltEntityEvent): T | nil
+  protected abstract initialData(
+    entity: LuaEntity,
+    event: OnBuiltEntityEvent | OnRobotBuiltEntityEvent | ScriptRaisedBuiltEvent,
+  ): T | nil
+
+  script_raised_built(event: ScriptRaisedBuiltEvent) {
+    this.onCreated(event.entity, event)
+  }
 
   on_built_entity(event: OnBuiltEntityEvent) {
     this.onCreated(event.created_entity, event)

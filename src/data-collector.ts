@@ -67,11 +67,6 @@ export function addDataCollector(dataCollector: DataCollector): void {
   add_lib(lib)
 }
 
-declare const __DebugAdapter:
-  | {
-      breakpoint(this: void): void
-    }
-  | nil
 add_lib({
   on_init() {
     getDataCollectors()

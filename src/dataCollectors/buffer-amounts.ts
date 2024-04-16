@@ -54,7 +54,7 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
     }
   }
 
-  private getMajorityKey(obj: Record<string, number>): string | nil {
+  private getMajorityKey(obj: Record<string, number>, threshold: number): string | nil {
     let maxKey: string | nil
     let max = 0
     let total = 0
@@ -65,7 +65,9 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
       }
       total += value
     }
-    if (max > total / 2) return maxKey
+    if (max >= total * threshold) {
+      return maxKey
+    }
   }
 
   protected override onPeriodicUpdate(entity: LuaEntity, data: TrackedBufferData) {
@@ -89,13 +91,13 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
     const maxAtTime: Record<string, number> = {}
     const itemCounts = data.itemCounts!
     for (const { counts } of itemCounts) {
-      const maxKey = this.getMajorityKey(counts)
+      const maxKey = this.getMajorityKey(counts, 2 / 3)
       if (maxKey) {
         maxAtTime[maxKey] = (maxAtTime[maxKey] ?? 0) + 1
       }
     }
-    const finalMax = this.getMajorityKey(maxAtTime)
-    if (!(finalMax && maxAtTime[finalMax] > this.minDataPointsToDetermineItem / 2)) {
+    const finalMax = this.getMajorityKey(maxAtTime, 1 / 2)
+    if (!finalMax) {
       // a multiplicity of items, probably not a buffer
       this.removeEntry(data.unitNumber)
       return
