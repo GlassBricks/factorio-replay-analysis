@@ -1,5 +1,5 @@
 import { NthTickEventData } from "factorio:runtime"
-import { DataCollector } from "../src/data-collector"
+import { DataCollector } from "../data-collector"
 
 let testStartTick = 0
 

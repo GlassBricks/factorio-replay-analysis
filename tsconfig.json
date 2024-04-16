@@ -1,47 +1,16 @@
 {
   "$schema": "https://raw.githubusercontent.com/TypeScriptToLua/TypeScriptToLua/master/tsconfig-schema.json",
+  "extends": "./tsconfig.base.json",
   "compilerOptions": {
-    "target": "esnext",
-    "moduleResolution": "node",
-    "module": "commonjs",
-    "rootDir": "src",
-    "outDir": "out",
-    "types": [
-      "typed-factorio/runtime",
-      "gb-tstl-utils"
-    ],
-    "lib": [
-      "esnext"
-    ],
-    "skipDefaultLibCheck": true,
-    "strict": true,
-    "experimentalDecorators": true,
-    "noImplicitThis": true,
-    "noImplicitOverride": true,
-    "noFallthroughCasesInSwitch": true,
-    "noEmitOnError": true
+    "outDir": "out"
   },
   "tstl": {
-    "luaTarget": "5.2",
-    "noResolvePaths": [
-      "freeplay",
-      "silo-script",
-      "event_handler"
-    ],
     "luaBundle": "control.lua",
     "luaBundleEntry": "src/control.ts",
-    "luaLibImport": "require-minimal",
-    "luaPlugins": [
-      {
-        "name": "gb-tstl-utils/plugin",
-        "simplifyDelete": true
-      }
-    ]
+    "luaLibImport": "require-minimal"
   },
   "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "**/node_modules/"
+    "src/main.ts",
+    "src/*.d.ts"
   ]
 }

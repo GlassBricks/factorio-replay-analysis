@@ -1,5 +1,5 @@
 import { simulateEvent, testDataCollector } from "./test-util"
-import RocketLaunchTime from "../src/dataCollectors/rocket-launch-time"
+import RocketLaunchTime from "../dataCollectors/rocket-launch-time"
 import expect from "tstl-expect"
 
 test("rocket-launch", () => {

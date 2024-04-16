@@ -1,5 +1,5 @@
 import { testDataCollector } from "./test-util"
-import PlayerPosition from "../src/dataCollectors/player-position"
+import PlayerPosition from "../dataCollectors/player-position"
 import expect from "tstl-expect"
 
 test("player position", () => {

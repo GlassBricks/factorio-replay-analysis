@@ -1,5 +1,5 @@
 import { testDataCollector } from "./test-util"
-import PlayerInventory from "../src/dataCollectors/player-inventory"
+import PlayerInventory from "../dataCollectors/player-inventory"
 import expect from "tstl-expect"
 
 test("tracks player inventory", () => {

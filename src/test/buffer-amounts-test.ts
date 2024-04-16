@@ -1,5 +1,5 @@
 import { LuaEntity, LuaSurface, MapPosition } from "factorio:runtime"
-import BufferAmounts from "../src/dataCollectors/buffer-amounts"
+import BufferAmounts from "../dataCollectors/buffer-amounts"
 import expect from "tstl-expect"
 import { testDataCollector } from "./test-util"
 

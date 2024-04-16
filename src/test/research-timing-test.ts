@@ -1,5 +1,5 @@
 import { simulateEvent, testDataCollector } from "./test-util"
-import ResearchTiming from "../src/dataCollectors/research-timing"
+import ResearchTiming from "../dataCollectors/research-timing"
 import { LuaTechnology } from "factorio:runtime"
 import expect from "tstl-expect"
 

@@ -295,6 +295,9 @@ function EntityTracker.prototype.onCreated(self, entity, event)
         end
     end
 end
+function EntityTracker.prototype.script_raised_built(self, event)
+    self:onCreated(event.entity, event)
+end
 function EntityTracker.prototype.on_built_entity(self, event)
     self:onCreated(event.created_entity, event)
 end
@@ -471,8 +474,8 @@ function MachineProduction.prototype.markProductionFinished(self, entity, info, 
     lastProduction.stoppedReason = reason
 end
 function MachineProduction.prototype.startNewProduction(self, info, recipe)
-    local ____info_recipeProduction_3 = info.recipeProduction
-    ____info_recipeProduction_3[#____info_recipeProduction_3 + 1] = {recipe = recipe, timeStarted = game.tick, production = {}}
+    local ____info_recipeProduction_5 = info.recipeProduction
+    ____info_recipeProduction_5[#____info_recipeProduction_5 + 1] = {recipe = recipe, timeStarted = game.tick, production = {}}
 end
 function MachineProduction.prototype.tryCheckRunningChanged(self, entity, knownStopReason)
     local info = self:getEntityData(entity)
@@ -591,7 +594,7 @@ function BufferAmounts.prototype.initialData(self, entity)
         itemCounts = {}
     }
 end
-function BufferAmounts.prototype.getMajorityKey(self, obj)
+function BufferAmounts.prototype.getMajorityKey(self, obj, threshold)
     local maxKey
     local max = 0
     local total = 0
@@ -602,7 +605,7 @@ function BufferAmounts.prototype.getMajorityKey(self, obj)
         end
         total = total + value
     end
-    if max > total / 2 then
+    if max >= total * threshold then
         return maxKey
     end
 end
@@ -629,13 +632,13 @@ function BufferAmounts.prototype.determineItemType(self, data)
     local itemCounts = data.itemCounts
     for ____, ____value in ipairs(itemCounts) do
         local counts = ____value.counts
-        local maxKey = self:getMajorityKey(counts)
+        local maxKey = self:getMajorityKey(counts, 2 / 3)
         if maxKey then
             maxAtTime[maxKey] = (maxAtTime[maxKey] or 0) + 1
         end
     end
-    local finalMax = self:getMajorityKey(maxAtTime)
-    if not (finalMax and maxAtTime[finalMax] > self.minDataPointsToDetermineItem / 2) then
+    local finalMax = self:getMajorityKey(maxAtTime, 1 / 2)
+    if not finalMax then
         self:removeEntry(data.unitNumber)
         return
     end
