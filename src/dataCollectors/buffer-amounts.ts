@@ -1,6 +1,6 @@
 import { MapPosition } from "factorio:prototype"
 import EntityTracker from "./entity-tracker"
-import { LuaEntity, nil, UnitNumber } from "factorio:runtime"
+import { EntityPrototypeFilterWrite, LuaEntity, nil, UnitNumber } from "factorio:runtime"
 import { DataCollector } from "../data-collector"
 
 export interface SingleBufferData {
@@ -8,7 +8,8 @@ export interface SingleBufferData {
   unitNumber: number
   location: MapPosition
   timeBuilt: number
-  item: string
+  type: "chest" | "tank"
+  content: string
   amounts: [time: number, amount: number][]
 }
 
@@ -18,11 +19,12 @@ export interface BufferData {
 }
 
 interface TrackedBufferData {
-  item?: string
+  content?: string
   name: string
   unitNumber: UnitNumber
   location: MapPosition
   timeBuilt: number
+  type: "chest" | "tank"
 
   itemCounts?: {
     time: number
@@ -36,17 +38,29 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
   constructor(
     public nth_tick_period: number = 60 * 5,
     public minDataPointsToDetermineItem: number = 5,
+    public includeTanks: boolean = true,
   ) {
-    super({
-      filter: "type",
-      type: "container",
-    })
+    const filters: EntityPrototypeFilterWrite[] = [
+      {
+        filter: "type",
+        type: ["container", "logistic-container"],
+      },
+    ]
+    if (includeTanks) {
+      filters.push({
+        filter: "type",
+        type: "storage-tank",
+        mode: "or",
+      })
+    }
+    super(...filters)
   }
 
   protected override initialData(entity: LuaEntity): TrackedBufferData | nil {
-    if (!entity.get_inventory(defines.inventory.chest)) return nil
+    const type = entity.type == "storage-tank" ? "tank" : "chest"
     return {
       name: entity.name,
+      type,
       unitNumber: entity.unit_number!,
       location: entity.position,
       timeBuilt: game.tick,
@@ -73,11 +87,17 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
   protected override onPeriodicUpdate(entity: LuaEntity, data: TrackedBufferData) {
     const amounts = data.amounts
     if (amounts) {
-      const itemCount = entity.get_inventory(defines.inventory.chest)!.get_item_count(assert(data.item))
-      amounts.push([game.tick, itemCount])
+      const counts =
+        data.type == "tank"
+          ? entity.get_fluid_count(assert(data.content))
+          : entity.get_inventory(defines.inventory.chest)!.get_item_count(assert(data.content))
+      amounts.push([game.tick, counts])
     } else {
       const itemCounts = assert(data.itemCounts)
-      const counts = entity.get_inventory(defines.inventory.chest)!.get_contents()
+      const counts =
+        data.type == "tank"
+          ? entity.get_fluid_contents()
+          : entity.get_inventory(defines.inventory.chest)!.get_contents()
       if (next(counts)[0] == nil) return
       itemCounts.push({ time: game.tick, counts })
       if (itemCounts.length == this.minDataPointsToDetermineItem) {
@@ -102,7 +122,7 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
       this.removeEntry(data.unitNumber)
       return
     }
-    data.item = finalMax
+    data.content = finalMax
 
     data.amounts = []
     for (const { time, counts } of itemCounts) {
@@ -125,10 +145,11 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
       if (!amounts[0]) continue
       buffers.push({
         name: data.name,
+        type: data.type,
         unitNumber: data.unitNumber,
         location: data.location,
         timeBuilt: data.timeBuilt,
-        item: data.item!,
+        content: data.content!,
         amounts: amounts,
       })
     }

@@ -45,10 +45,11 @@ test("chest with single item counted", () => {
     expect(data.buffers).toEqual([
       {
         name: "iron-chest",
+        type: "chest",
         unitNumber: chest.unit_number,
         location: chest.position,
         timeBuilt: 0,
-        item: "iron-plate",
+        content: "iron-plate",
         amounts: expect.anything(),
       },
     ])
@@ -76,7 +77,7 @@ test("chest that is super-majority one item counted", () => {
     expect(data.buffers).toMatchTable([
       {
         name: "iron-chest",
-        item: "iron-plate",
+        content: "iron-plate",
       },
     ])
   })
@@ -97,5 +98,43 @@ test("tracks content over time", () => {
       [50, 7],
       [60, 7],
     ])
+  })
+})
+
+test("tank with single fluid counted", () => {
+  const tank = assert(
+    surface.create_entity({
+      name: "storage-tank",
+      position: { x: 0.5, y: 0.5 },
+      raise_built: true,
+    }),
+  )
+  tank.fluidbox[0] = {
+    name: "water",
+    amount: 100,
+    temperature: 15,
+  }
+  after_ticks(39, () => {
+    tank.fluidbox[0] = {
+      name: "water",
+      amount: 200,
+      temperature: 15,
+    }
+  })
+  after_ticks(100, () => {
+    const data = dc.exportData()
+    expect(data.buffers).toEqual([
+      {
+        name: "storage-tank",
+        type: "tank",
+        unitNumber: tank.unit_number,
+        location: tank.position,
+        timeBuilt: 0,
+        content: "water",
+        amounts: expect.anything(),
+      },
+    ])
+    expect(data.buffers[0].amounts).toContainEqual([30, 100])
+    expect(data.buffers[0].amounts).toContainEqual([40, 200])
   })
 })

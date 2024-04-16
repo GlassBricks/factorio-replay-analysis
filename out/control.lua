@@ -588,16 +588,20 @@ ____exports.default = __TS__Class()
 local BufferAmounts = ____exports.default
 BufferAmounts.name = "BufferAmounts"
 __TS__ClassExtends(BufferAmounts, EntityTracker)
-function BufferAmounts.prototype.____constructor(self, nth_tick_period, minDataPointsToDetermineItem)
+function BufferAmounts.prototype.____constructor(self, nth_tick_period, minDataPointsToDetermineItem, includeTanks)
     if nth_tick_period == nil then
         nth_tick_period = 60 * 5
     end
     if minDataPointsToDetermineItem == nil then
         minDataPointsToDetermineItem = 5
     end
-    EntityTracker.prototype.____constructor(self, {filter = "type", type = "container"})
+    if includeTanks == nil then
+        includeTanks = true
+    end
+    EntityTracker.prototype.____constructor(self, {filter = "type", type = {"container", "logistic-container"}}, {filter = "type", type = "storage-tank", mode = "or"})
     self.nth_tick_period = nth_tick_period
     self.minDataPointsToDetermineItem = minDataPointsToDetermineItem
+    self.includeTanks = includeTanks
 end
 function BufferAmounts.prototype.initialData(self, entity)
     if not entity.get_inventory(defines.inventory.chest) then
