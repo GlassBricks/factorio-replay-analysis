@@ -1,5 +1,5 @@
 import { add_lib, EventLib } from "event_handler"
-import { nil, NthTickEventData } from "factorio:runtime"
+import { NthTickEventData } from "factorio:runtime"
 
 export type EventHandlers = {
   [K in keyof typeof defines.events]?: (event: (typeof defines.events)[K]["_eventData"]) => void

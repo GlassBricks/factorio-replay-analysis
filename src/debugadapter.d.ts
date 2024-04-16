@@ -1,5 +1,3 @@
-import { nil } from "factorio:runtime"
-
 declare global {
   /** @noSelf */
   interface DebugAdapter {
@@ -7,3 +5,4 @@ declare global {
   }
   const __DebugAdapter: DebugAdapter
 }
+export {}
