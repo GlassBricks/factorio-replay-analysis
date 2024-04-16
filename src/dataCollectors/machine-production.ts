@@ -150,12 +150,40 @@ export default class MachineProduction
     const recipeProduction = info.recipeProduction
     const currentProduction = recipeProduction[recipeProduction.length - 1]
     const lastEntry = currentProduction.production[currentProduction.production.length - 1]
-    if (lastEntry == nil || lastEntry[0] != tick) {
-      const productsFinished = entity.products_finished
-      const delta = productsFinished - info.lastProductsFinished
-      info.lastProductsFinished = productsFinished
-      currentProduction.production.push([tick, delta, status])
+    if (!(lastEntry == nil || lastEntry[0] != tick)) {
+      return
     }
+    const productsFinished = entity.products_finished
+    const delta = productsFinished - info.lastProductsFinished
+    info.lastProductsFinished = productsFinished
+
+    let extraInfo: unknown = nil
+    if (status == "item_ingredient_shortage") {
+      const currentInputs = entity.get_inventory(defines.inventory.assembling_machine_input)!.get_contents()
+      const needed = entity.get_recipe()!.ingredients
+      const missingIngredients: string[] = []
+      for (const { type, amount, name } of needed) {
+        if (type != "item") continue
+        const currentAmount = currentInputs[name]
+        if (currentAmount == nil || currentAmount < amount) {
+          missingIngredients.push(name)
+        }
+      }
+      extraInfo = missingIngredients
+    } else if (status == "fluid_ingredient_shortage") {
+      const needed = entity.get_recipe()!.ingredients
+      const missingIngredients: string[] = []
+      for (const { type, amount, name } of needed) {
+        if (type != "fluid") continue
+        const currentAmount = entity.get_fluid_count(name)
+        if (currentAmount == nil || currentAmount < amount) {
+          missingIngredients.push(name)
+        }
+      }
+      extraInfo = missingIngredients
+    }
+
+    currentProduction.production.push([tick, delta, status, extraInfo])
   }
 
   private markProductionFinished(

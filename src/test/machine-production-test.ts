@@ -79,13 +79,42 @@ test("can track a machine producing items", () => {
         recipe: "iron-gear-wheel",
         timeStarted: 90,
         production: [
-          [120, 0, "item_ingredient_shortage"],
+          [120, 0, "item_ingredient_shortage", ["iron-plate"]],
           [180, 0, "working"],
           [240, 1, "working"],
           [300, 1, "working"],
           [360, 1, "full_output"],
         ],
       },
+    ])
+  })
+})
+
+test("includes all missing ingredients", () => {
+  createPowerSource()
+  const asm = createEntity("assembling-machine-2")
+  asm.get_module_inventory()!.insert({ name: "speed-module-3", count: 2 })
+  after_ticks(90, () => {
+    asm.set_recipe("electric-engine-unit")
+    simulateEvent(defines.events.on_gui_closed, { entity: asm } as OnGuiClosedEvent)
+  })
+  after_ticks(150, () => {
+    asm.insert({ name: "engine-unit", count: 1 })
+    asm.insert({ name: "electronic-circuit", count: 2 })
+    asm.insert_fluid({ name: "lubricant", amount: 5 })
+  })
+  after_ticks(239, () => {
+    asm.insert({ name: "engine-unit", count: 1 })
+    asm.insert({ name: "electronic-circuit", count: 50 })
+    asm.insert_fluid({ name: "lubricant", amount: 50 })
+  })
+  after_ticks(660, () => {
+    done()
+    const data = dc.exportData()
+    expect(data.machines[0].recipes[0].production).toMatchTable([
+      [120, 0, "item_ingredient_shortage", ["electronic-circuit", "engine-unit"]],
+      [180, 0, "fluid_ingredient_shortage", ["lubricant"]],
+      [240, 0, "working"],
     ])
   })
 })
