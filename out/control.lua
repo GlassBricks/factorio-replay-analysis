@@ -434,7 +434,7 @@ function MachineProduction.prototype.initialData(self, entity)
         location = entity.position,
         timeBuilt = game.tick,
         lastProductsFinished = 0,
-        lastRecipe = nil,
+        lastRunningRecipe = nil,
         recipeProduction = {}
     }
 end
@@ -452,6 +452,7 @@ function MachineProduction.prototype.addDataPoint(self, entity, info, status)
     end
 end
 function MachineProduction.prototype.markProductionFinished(self, entity, info, status, reason)
+    info.lastRunningRecipe = nil
     local recipeProduction = info.recipeProduction
     local lastProduction = recipeProduction[#recipeProduction]
     if lastProduction == nil then
@@ -474,6 +475,7 @@ function MachineProduction.prototype.markProductionFinished(self, entity, info, 
     lastProduction.stoppedReason = reason
 end
 function MachineProduction.prototype.startNewProduction(self, info, recipe)
+    info.lastRunningRecipe = recipe
     local ____info_recipeProduction_5 = info.recipeProduction
     ____info_recipeProduction_5[#____info_recipeProduction_5 + 1] = {recipe = recipe, timeStarted = game.tick, production = {}}
 end
@@ -484,13 +486,18 @@ function MachineProduction.prototype.tryCheckRunningChanged(self, entity, knownS
     end
 end
 function MachineProduction.prototype.checkRunningChanged(self, entity, info, status, knownStopReason)
-    local ____opt_6 = entity.get_recipe()
-    local recipe = ____opt_6 and ____opt_6.name
-    local lastRecipe = info.lastRecipe
-    if not recipe and entity.type == "furnace" then
-        recipe = lastRecipe
+    local ____entity_get_recipe_result_9 = entity.get_recipe()
+    if ____entity_get_recipe_result_9 == nil then
+        local ____temp_8
+        if entity.type == "furnace" then
+            ____temp_8 = entity.previous_recipe
+        else
+            ____temp_8 = nil
+        end
+        ____entity_get_recipe_result_9 = ____temp_8
     end
-    info.lastRecipe = recipe
+    local recipe = ____entity_get_recipe_result_9 and ____entity_get_recipe_result_9.name
+    local lastRecipe = info.lastRunningRecipe
     local recipeChanged = recipe ~= lastRecipe
     if status == nil then
         status = self:getStatus(entity)
@@ -543,8 +550,18 @@ function MachineProduction.prototype.exportData(self)
     for ____, machine in pairs(self.entityData) do
         do
             local recipes = machine.recipeProduction
+            while #recipes > 0 and (#recipes[#recipes].production == 0 or __TS__ArrayEvery(
+                recipes[#recipes].production,
+                function(____, ____bindingPattern0)
+                    local delta
+                    delta = ____bindingPattern0[2]
+                    return delta == 0
+                end
+            )) do
+                table.remove(recipes)
+            end
             if #recipes == 0 then
-                goto __continue37
+                goto __continue36
             end
             machines[#machines + 1] = {
                 name = machine.name,
@@ -554,7 +571,7 @@ function MachineProduction.prototype.exportData(self)
                 recipes = recipes
             }
         end
-        ::__continue37::
+        ::__continue36::
     end
     return {period = self.nth_tick_period, machines = machines}
 end
@@ -783,7 +800,7 @@ function ResearchTiming.prototype.exportData(self)
 end
 return ____exports
  end,
-["control"] = function(...) 
+["main"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__New = ____lualib.__TS__New
 local ____exports = {}
@@ -857,4 +874,4 @@ handler.add_lib(require("freeplay"))
 handler.add_lib(require("silo-script"))
  end,
 }
-return require("control", ...)
+return require("main", ...)

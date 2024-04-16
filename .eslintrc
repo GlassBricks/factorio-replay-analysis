@@ -9,7 +9,7 @@
     "import/resolver": "typescript"
   },
   "parserOptions": {
-    "project": ["tsconfig.json", "tsconfig.test.json"]
+    "project": ["tsconfig.release.json", "tsconfig.test.json"]
   },
   "extends": [
     "eslint:recommended",

@@ -70,7 +70,6 @@ const craftingMachineStatuses = list_to_map<string>([
   "full_output",
   "item_ingredient_shortage",
 ])
-// const furnaceStatuses: (keyof typeof defines.entity_status)[] = [...commonStatuses, "no_ingredients"]
 const furnaceStatuses = list_to_map<string>([...commonStatuses, "no_ingredients"])
 
 const reverseMap: Record<defines.entity_status, EntityStatus> = {}
@@ -84,7 +83,7 @@ interface TrackedMachineData {
   location: MapPosition
   timeBuilt: number
   lastProductsFinished: number
-  lastRecipe: string | nil
+  lastRunningRecipe: string | nil
   recipeProduction: MachineRecipeProduction[]
 }
 
@@ -141,7 +140,7 @@ export default class MachineProduction
       location: entity.position,
       timeBuilt: game.tick,
       lastProductsFinished: 0,
-      lastRecipe: nil,
+      lastRunningRecipe: nil,
       recipeProduction: [],
     }
   }
@@ -165,6 +164,7 @@ export default class MachineProduction
     status: EntityStatus,
     reason: StopReason,
   ) {
+    info.lastRunningRecipe = nil
     const recipeProduction = info.recipeProduction
     const lastProduction = recipeProduction[recipeProduction.length - 1]
     if (lastProduction == nil) return
@@ -179,6 +179,7 @@ export default class MachineProduction
   }
 
   private startNewProduction(info: TrackedMachineData, recipe: string) {
+    info.lastRunningRecipe = recipe
     info.recipeProduction.push({
       recipe,
       timeStarted: game.tick,
@@ -202,13 +203,8 @@ export default class MachineProduction
     status: EntityStatus | nil,
     knownStopReason: StopReason | nil,
   ): LuaMultiReturn<[updated: boolean, isRunning: boolean]> {
-    let recipe = entity.get_recipe()?.name
-    const lastRecipe = info.lastRecipe
-    if (!recipe && entity.type == "furnace") {
-      // furnaces without ingredients show up as no recipe; we instead want to keep the last recipe
-      recipe = lastRecipe
-    }
-    info.lastRecipe = recipe
+    const recipe = (entity.get_recipe() ?? (entity.type == "furnace" ? entity.previous_recipe : nil))?.name
+    const lastRecipe = info.lastRunningRecipe
     const recipeChanged = recipe != lastRecipe
     status ??= this.getStatus(entity)
     const isStopped = knownStopReason != nil || isStoppingStatus(status)
@@ -266,6 +262,13 @@ export default class MachineProduction
     const machines: MachineData[] = []
     for (const [, machine] of pairs(this.entityData)) {
       const recipes = machine.recipeProduction
+      while (
+        recipes.length > 0 &&
+        (recipes[recipes.length - 1].production.length == 0 ||
+          recipes[recipes.length - 1].production.every(([, delta]) => delta == 0))
+      ) {
+        recipes.pop()
+      }
       if (recipes.length == 0) continue
       machines.push({
         name: machine.name,

@@ -6,8 +6,14 @@
   },
   "tstl": {
     "luaBundle": "control.lua",
-    "luaBundleEntry": "src/control.ts",
-    "luaLibImport": "require-minimal"
+    "luaBundleEntry": "src/main.ts",
+    "luaLibImport": "require-minimal",
+    "luaPlugins": [
+      {
+        "name": "gb-tstl-utils/plugin",
+        "simplifyDelete": true
+      }
+    ]
   },
   "include": [
     "src/main.ts",

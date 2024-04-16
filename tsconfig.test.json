@@ -9,5 +9,14 @@
       "factorio-test"
     ]
   },
+  "tstl": {
+    "luaPlugins": [
+      {
+        "name": "gb-tstl-utils/plugin",
+        "simplifyDelete": true
+      }
+    ],
+    "sourceMapTraceback": true
+  },
   "include": ["src/test/**/*.ts", "src/control.ts", "src/*.d.ts"]
 }

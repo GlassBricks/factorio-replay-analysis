@@ -26,14 +26,7 @@
       "freeplay",
       "silo-script",
       "event_handler"
-    ],
-    "luaPlugins": [
-      {
-        "name": "gb-tstl-utils/plugin",
-        "simplifyDelete": true
-      }
     ]
-    
   },
   "exclude": [
     "**/node_modules/"
