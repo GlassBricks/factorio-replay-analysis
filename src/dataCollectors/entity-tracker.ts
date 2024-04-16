@@ -39,7 +39,7 @@ export default abstract class EntityTracker<T> {
     }
   }
 
-  protected abstract initialData(entity: LuaEntity, event: OnBuiltEntityEvent | OnRobotBuiltEntityEvent): T | undefined
+  protected abstract initialData(entity: LuaEntity, event: OnBuiltEntityEvent | OnRobotBuiltEntityEvent): T | nil
 
   on_built_entity(event: OnBuiltEntityEvent) {
     this.onCreated(event.created_entity, event)
@@ -73,18 +73,18 @@ export default abstract class EntityTracker<T> {
     this.onDeleted(event.entity, event)
   }
 
-  protected getEntityData(entity: LuaEntity, unitNumber?: UnitNumber): T | undefined {
+  protected getEntityData(entity: LuaEntity, unitNumber?: UnitNumber): T | nil {
     if (!entity.valid) {
       if (unitNumber) {
         delete this.trackedEntities[unitNumber]
       }
-      return undefined
+      return nil
     }
     unitNumber ??= entity.unit_number
     if (unitNumber) {
       return this.entityData[unitNumber]
     }
-    return undefined
+    return nil
   }
 
   protected abstract onPeriodicUpdate(entity: LuaEntity, data: T): void

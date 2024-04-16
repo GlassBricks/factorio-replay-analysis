@@ -11,6 +11,7 @@ import {
 } from "factorio:runtime"
 import EntityTracker from "./entity-tracker"
 import { DataCollector } from "../data-collector"
+import { list_to_map } from "util"
 
 type EntityStatus = keyof typeof defines.entity_status | "unknown"
 
@@ -34,7 +35,7 @@ interface MachineRecipeProduction {
   timeStarted: number
   timeStopped?: number
   stoppedReason?: StopReason
-  production: [time: number, productsFinished: number, status: EntityStatus][]
+  production: [time: number, productsFinished: number, status: EntityStatus, additionalInfo?: unknown][]
 }
 
 const stoppedStatuses = {
@@ -51,7 +52,7 @@ function isStoppingStatus(
 
 // assemblers, chem plants, refineries, furnaces
 
-const commonStatuses = [
+const commonStatuses = list_to_map<string>([
   "working",
   "normal",
   "no_power",
@@ -60,15 +61,21 @@ const commonStatuses = [
   "disabled_by_control_behavior",
   "disabled_by_script",
   "marked_for_deconstruction",
-] satisfies (keyof typeof defines.entity_status)[]
-const craftingMachineStatuses: (keyof typeof defines.entity_status)[] = [
+] satisfies (keyof typeof defines.entity_status)[])
+const craftingMachineStatuses = list_to_map<string>([
   ...commonStatuses,
   "no_recipe",
   "fluid_ingredient_shortage",
   "full_output",
   "item_ingredient_shortage",
-]
-const furnaceStatuses: (keyof typeof defines.entity_status)[] = [...commonStatuses, "no_ingredients"]
+])
+// const furnaceStatuses: (keyof typeof defines.entity_status)[] = [...commonStatuses, "no_ingredients"]
+const furnaceStatuses = list_to_map<string>([...commonStatuses, "no_ingredients"])
+
+const reverseMap: Record<defines.entity_status, EntityStatus> = {}
+for (const [key, value] of pairs(defines.entity_status)) {
+  reverseMap[value] = key
+}
 
 interface TrackedMachineData {
   name: string
@@ -76,7 +83,7 @@ interface TrackedMachineData {
   location: MapPosition
   timeBuilt: number
   lastProductsFinished: number
-  lastRecipe: string | undefined
+  lastRecipe: string | nil
   recipeProduction: MachineRecipeProduction[]
 }
 
@@ -114,10 +121,10 @@ export default class MachineProduction
           : error("Invalid entity type")
 
     const status = entity.status
-    for (const key of keys) {
-      if (defines.entity_status[key] == status) {
-        return key
-      }
+    if (status == nil) return "unknown"
+    const statusText = reverseMap[status]
+    if (keys.has(statusText)) {
+      return statusText
     }
     log("Unknown status for crafting machine: " + status)
     for (const [key, value] of pairs(defines.entity_status)) {
@@ -133,7 +140,7 @@ export default class MachineProduction
       location: entity.position,
       timeBuilt: game.tick,
       lastProductsFinished: 0,
-      lastRecipe: undefined,
+      lastRecipe: nil,
       recipeProduction: [],
     }
   }
@@ -143,7 +150,7 @@ export default class MachineProduction
     const recipeProduction = info.recipeProduction
     const currentProduction = recipeProduction[recipeProduction.length - 1]
     const lastEntry = currentProduction.production[currentProduction.production.length - 1]
-    if (lastEntry == undefined || lastEntry[0] != tick) {
+    if (lastEntry == nil || lastEntry[0] != tick) {
       const productsFinished = entity.products_finished
       const delta = productsFinished - info.lastProductsFinished
       info.lastProductsFinished = productsFinished
@@ -159,7 +166,7 @@ export default class MachineProduction
   ) {
     const recipeProduction = info.recipeProduction
     const lastProduction = recipeProduction[recipeProduction.length - 1]
-    if (lastProduction == undefined) return
+    if (lastProduction == nil) return
     this.addDataPoint(entity, info, status)
     const production = lastProduction.production
     if (production.length === 0 || production.every(([, delta]) => delta == 0)) {
@@ -181,7 +188,7 @@ export default class MachineProduction
   private tryCheckRunningChanged(entity: LuaEntity, knownStopReason?: StopReason) {
     const info = this.getEntityData(entity)
     if (info) {
-      this.checkRunningChanged(entity, info, undefined, knownStopReason)
+      this.checkRunningChanged(entity, info, nil, knownStopReason)
     }
   }
 
@@ -191,8 +198,8 @@ export default class MachineProduction
   private checkRunningChanged(
     entity: LuaEntity,
     info: TrackedMachineData,
-    status: EntityStatus | undefined,
-    knownStopReason: StopReason | undefined,
+    status: EntityStatus | nil,
+    knownStopReason: StopReason | nil,
   ): LuaMultiReturn<[updated: boolean, isRunning: boolean]> {
     let recipe = entity.get_recipe()?.name
     const lastRecipe = info.lastRecipe
@@ -203,7 +210,7 @@ export default class MachineProduction
     info.lastRecipe = recipe
     const recipeChanged = recipe != lastRecipe
     status ??= this.getStatus(entity)
-    const isStopped = knownStopReason != undefined || isStoppingStatus(status)
+    const isStopped = knownStopReason != nil || isStoppingStatus(status)
     let updated = false
     if (lastRecipe) {
       if (recipeChanged || status == "no_recipe") {
@@ -218,7 +225,7 @@ export default class MachineProduction
       this.startNewProduction(info, recipe)
       updated = true
     }
-    return $multi(updated, !isStopped && recipe != undefined)
+    return $multi(updated, !isStopped && recipe != nil)
   }
 
   protected override onDeleted(
@@ -234,20 +241,20 @@ export default class MachineProduction
   }
 
   on_cancelled_deconstruction(event: OnMarkedForDeconstructionEvent) {
-    this.tryCheckRunningChanged(event.entity, undefined)
+    this.tryCheckRunningChanged(event.entity, nil)
   }
 
   on_gui_closed(event: OnGuiClosedEvent) {
-    if (event.entity) this.tryCheckRunningChanged(event.entity, undefined)
+    if (event.entity) this.tryCheckRunningChanged(event.entity, nil)
   }
 
   on_entity_settings_pasted(event: OnEntitySettingsPastedEvent) {
-    this.tryCheckRunningChanged(event.destination, undefined)
+    this.tryCheckRunningChanged(event.destination, nil)
   }
 
   override onPeriodicUpdate(entity: LuaEntity, data: TrackedMachineData) {
     const status = this.getStatus(entity)
-    const [updated, isRunning] = this.checkRunningChanged(entity, data, status, undefined)
+    const [updated, isRunning] = this.checkRunningChanged(entity, data, status, nil)
     const shouldAddDataPoint = !updated && isRunning
     if (shouldAddDataPoint) {
       this.addDataPoint(entity, data, status)

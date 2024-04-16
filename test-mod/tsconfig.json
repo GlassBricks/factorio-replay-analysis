@@ -4,10 +4,10 @@
     "target": "esnext",
     "moduleResolution": "node",
     "module": "commonjs",
-    "rootDir": "src",
-    "outDir": "out",
+    "outDir": ".",
     "types": [
       "typed-factorio/runtime",
+      "factorio-test",
       "gb-tstl-utils"
     ],
     "lib": [
@@ -28,8 +28,6 @@
       "silo-script",
       "event_handler"
     ],
-    "luaBundle": "control.lua",
-    "luaBundleEntry": "src/control.ts",
     "luaLibImport": "require-minimal",
     "luaPlugins": [
       {
@@ -39,7 +37,8 @@
     ]
   },
   "include": [
-    "src/**/*"
+    "./**/*.ts",
+    "../src/*.d.ts"
   ],
   "exclude": [
     "**/node_modules/"

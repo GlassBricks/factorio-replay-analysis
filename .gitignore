@@ -1,3 +1,6 @@
 .idea
 .vscode
 node_modules/**
+factorio-test-data/
+test-mod/**/*.lua
+!test-mod/control.lua

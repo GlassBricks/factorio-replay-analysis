@@ -1,5 +1,5 @@
 import { add_lib, EventLib } from "event_handler"
-import { NthTickEventData } from "factorio:runtime"
+import { nil, NthTickEventData } from "factorio:runtime"
 
 export type EventHandlers = {
   [K in keyof typeof defines.events]?: (event: (typeof defines.events)[K]["_eventData"]) => void
@@ -71,7 +71,7 @@ declare const __DebugAdapter:
   | {
       breakpoint(this: void): void
     }
-  | undefined
+  | nil
 add_lib({
   on_init() {
     getDataCollectors()

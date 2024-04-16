@@ -43,8 +43,8 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
     })
   }
 
-  protected override initialData(entity: LuaEntity): TrackedBufferData | undefined {
-    if (!entity.get_inventory(defines.inventory.chest)) return undefined
+  protected override initialData(entity: LuaEntity): TrackedBufferData | nil {
+    if (!entity.get_inventory(defines.inventory.chest)) return nil
     return {
       name: entity.name,
       unitNumber: entity.unit_number!,
@@ -54,8 +54,8 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
     }
   }
 
-  private getMajorityKey(obj: Record<string, number>): string | undefined {
-    let maxKey: string | undefined
+  private getMajorityKey(obj: Record<string, number>): string | nil {
+    let maxKey: string | nil
     let max = 0
     let total = 0
     for (const [key, value] of pairs(obj)) {
@@ -76,7 +76,7 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
     } else {
       const itemCounts = assert(data.itemCounts)
       const counts = entity.get_inventory(defines.inventory.chest)!.get_contents()
-      if (next(counts)[0] == undefined) return
+      if (next(counts)[0] == nil) return
       itemCounts.push({ time: game.tick, counts })
       if (itemCounts.length == this.minDataPointsToDetermineItem) {
         this.determineItemType(data)
