@@ -1,6 +1,6 @@
 import { MapPosition } from "factorio:prototype"
 import EntityTracker from "./entity-tracker"
-import { LuaEntity, UnitNumber } from "factorio:runtime"
+import { LuaEntity, nil, UnitNumber } from "factorio:runtime"
 import { DataCollector } from "../data-collector"
 
 export interface SingleBufferData {

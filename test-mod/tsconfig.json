@@ -34,7 +34,7 @@
         "name": "gb-tstl-utils/plugin",
         "simplifyDelete": true
       }
-    ]
+    ],
   },
   "include": [
     "./**/*.ts",

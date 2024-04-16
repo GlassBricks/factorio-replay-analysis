@@ -1,6 +1,7 @@
 import {
   EntityPrototypeFilterWrite,
   LuaEntity,
+  nil,
   OnBuiltEntityEvent,
   OnEntityDiedEvent,
   OnPrePlayerMinedItemEvent,

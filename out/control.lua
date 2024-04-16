@@ -57,153 +57,14 @@ local function __TS__Class(self)
     return c
 end
 
-local function __TS__StringIncludes(self, searchString, position)
-    if not position then
-        position = 1
-    else
-        position = position + 1
+local function __TS__ObjectKeys(obj)
+    local result = {}
+    local len = 0
+    for key in pairs(obj) do
+        len = len + 1
+        result[len] = key
     end
-    local index = string.find(self, searchString, position, true)
-    return index ~= nil
-end
-
-local function __TS__New(target, ...)
-    local instance = setmetatable({}, target.prototype)
-    instance:____constructor(...)
-    return instance
-end
-
-local function __TS__ClassExtends(target, base)
-    target.____super = base
-    local staticMetatable = setmetatable({__index = base}, base)
-    setmetatable(target, staticMetatable)
-    local baseMetatable = getmetatable(base)
-    if baseMetatable then
-        if type(baseMetatable.__index) == "function" then
-            staticMetatable.__index = baseMetatable.__index
-        end
-        if type(baseMetatable.__newindex) == "function" then
-            staticMetatable.__newindex = baseMetatable.__newindex
-        end
-    end
-    setmetatable(target.prototype, base.prototype)
-    if type(base.prototype.__index) == "function" then
-        target.prototype.__index = base.prototype.__index
-    end
-    if type(base.prototype.__newindex) == "function" then
-        target.prototype.__newindex = base.prototype.__newindex
-    end
-    if type(base.prototype.__tostring) == "function" then
-        target.prototype.__tostring = base.prototype.__tostring
-    end
-end
-
-local Error, RangeError, ReferenceError, SyntaxError, TypeError, URIError
-do
-    local function getErrorStack(self, constructor)
-        if debug == nil then
-            return nil
-        end
-        local level = 1
-        while true do
-            local info = debug.getinfo(level, "f")
-            level = level + 1
-            if not info then
-                level = 1
-                break
-            elseif info.func == constructor then
-                break
-            end
-        end
-        if __TS__StringIncludes(_VERSION, "Lua 5.0") then
-            return debug.traceback(("[Level " .. tostring(level)) .. "]")
-        else
-            return debug.traceback(nil, level)
-        end
-    end
-    local function wrapErrorToString(self, getDescription)
-        return function(self)
-            local description = getDescription(self)
-            local caller = debug.getinfo(3, "f")
-            local isClassicLua = __TS__StringIncludes(_VERSION, "Lua 5.0") or _VERSION == "Lua 5.1"
-            if isClassicLua or caller and caller.func ~= error then
-                return description
-            else
-                return (description .. "\n") .. tostring(self.stack)
-            end
-        end
-    end
-    local function initErrorClass(self, Type, name)
-        Type.name = name
-        return setmetatable(
-            Type,
-            {__call = function(____, _self, message) return __TS__New(Type, message) end}
-        )
-    end
-    local ____initErrorClass_1 = initErrorClass
-    local ____class_0 = __TS__Class()
-    ____class_0.name = ""
-    function ____class_0.prototype.____constructor(self, message)
-        if message == nil then
-            message = ""
-        end
-        self.message = message
-        self.name = "Error"
-        self.stack = getErrorStack(nil, self.constructor.new)
-        local metatable = getmetatable(self)
-        if metatable and not metatable.__errorToStringPatched then
-            metatable.__errorToStringPatched = true
-            metatable.__tostring = wrapErrorToString(nil, metatable.__tostring)
-        end
-    end
-    function ____class_0.prototype.__tostring(self)
-        return self.message ~= "" and (self.name .. ": ") .. self.message or self.name
-    end
-    Error = ____initErrorClass_1(nil, ____class_0, "Error")
-    local function createErrorClass(self, name)
-        local ____initErrorClass_3 = initErrorClass
-        local ____class_2 = __TS__Class()
-        ____class_2.name = ____class_2.name
-        __TS__ClassExtends(____class_2, Error)
-        function ____class_2.prototype.____constructor(self, ...)
-            ____class_2.____super.prototype.____constructor(self, ...)
-            self.name = name
-        end
-        return ____initErrorClass_3(nil, ____class_2, name)
-    end
-    RangeError = createErrorClass(nil, "RangeError")
-    ReferenceError = createErrorClass(nil, "ReferenceError")
-    SyntaxError = createErrorClass(nil, "SyntaxError")
-    TypeError = createErrorClass(nil, "TypeError")
-    URIError = createErrorClass(nil, "URIError")
-end
-
-local function __TS__ObjectGetOwnPropertyDescriptors(object)
-    local metatable = getmetatable(object)
-    if not metatable then
-        return {}
-    end
-    return rawget(metatable, "_descriptors") or ({})
-end
-
-local function __TS__Delete(target, key)
-    local descriptors = __TS__ObjectGetOwnPropertyDescriptors(target)
-    local descriptor = descriptors[key]
-    if descriptor then
-        if not descriptor.configurable then
-            error(
-                __TS__New(
-                    TypeError,
-                    ((("Cannot delete property " .. tostring(key)) .. " of ") .. tostring(target)) .. "."
-                ),
-                0
-            )
-        end
-        descriptors[key] = nil
-        return true
-    end
-    target[key] = nil
-    return true
+    return result
 end
 
 local function __TS__CountVarargs(...)
@@ -231,6 +92,31 @@ local function __TS__SparseArraySpread(sparseArray)
     return _unpack(sparseArray, 1, sparseArray.sparseLength)
 end
 
+local function __TS__ClassExtends(target, base)
+    target.____super = base
+    local staticMetatable = setmetatable({__index = base}, base)
+    setmetatable(target, staticMetatable)
+    local baseMetatable = getmetatable(base)
+    if baseMetatable then
+        if type(baseMetatable.__index) == "function" then
+            staticMetatable.__index = baseMetatable.__index
+        end
+        if type(baseMetatable.__newindex) == "function" then
+            staticMetatable.__newindex = baseMetatable.__newindex
+        end
+    end
+    setmetatable(target.prototype, base.prototype)
+    if type(base.prototype.__index) == "function" then
+        target.prototype.__index = base.prototype.__index
+    end
+    if type(base.prototype.__newindex) == "function" then
+        target.prototype.__newindex = base.prototype.__newindex
+    end
+    if type(base.prototype.__tostring) == "function" then
+        target.prototype.__tostring = base.prototype.__tostring
+    end
+end
+
 local function __TS__ArrayEvery(self, callbackfn, thisArg)
     for i = 1, #self do
         if not callbackfn(thisArg, self[i], i - 1, self) then
@@ -240,12 +126,18 @@ local function __TS__ArrayEvery(self, callbackfn, thisArg)
     return true
 end
 
+local function __TS__New(target, ...)
+    local instance = setmetatable({}, target.prototype)
+    instance:____constructor(...)
+    return instance
+end
+
 return {
   __TS__StringAccess = __TS__StringAccess,
   __TS__StringEndsWith = __TS__StringEndsWith,
   __TS__StringSlice = __TS__StringSlice,
   __TS__Class = __TS__Class,
-  __TS__Delete = __TS__Delete,
+  __TS__ObjectKeys = __TS__ObjectKeys,
   __TS__SparseArrayNew = __TS__SparseArrayNew,
   __TS__SparseArrayPush = __TS__SparseArrayPush,
   __TS__SparseArraySpread = __TS__SparseArraySpread,
@@ -376,7 +268,6 @@ return ____exports
 ["dataCollectors.entity-tracker"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
-local __TS__Delete = ____lualib.__TS__Delete
 local ____exports = {}
 ____exports.default = __TS__Class()
 local EntityTracker = ____exports.default
@@ -392,7 +283,7 @@ function EntityTracker.prototype.on_init(self)
     for name in pairs(game.get_filtered_entity_prototypes(self.prototypeFilters)) do
         self.prototypes[name] = true
     end
-    __TS__Delete(self, "prototypeFilters")
+    self.prototypeFilters = nil
 end
 function EntityTracker.prototype.onCreated(self, entity, event)
     local unitNumber = entity.unit_number
@@ -417,7 +308,7 @@ function EntityTracker.prototype.onDeleted(self, entity, _event)
     end
 end
 function EntityTracker.prototype.removeEntry(self, unitNumber)
-    __TS__Delete(self.trackedEntities, unitNumber)
+    self.trackedEntities[unitNumber] = nil
 end
 function EntityTracker.prototype.on_pre_player_mined_item(self, event)
     self:onDeleted(event.entity, event)
@@ -431,7 +322,7 @@ end
 function EntityTracker.prototype.getEntityData(self, entity, unitNumber)
     if not entity.valid then
         if unitNumber then
-            __TS__Delete(self.trackedEntities, unitNumber)
+            self.trackedEntities[unitNumber] = nil
         end
         return nil
     end
@@ -455,6 +346,7 @@ return ____exports
  end,
 ["dataCollectors.machine-production"] = function(...) 
 local ____lualib = require("lualib_bundle")
+local __TS__ObjectKeys = ____lualib.__TS__ObjectKeys
 local __TS__SparseArrayNew = ____lualib.__TS__SparseArrayNew
 local __TS__SparseArrayPush = ____lualib.__TS__SparseArrayPush
 local __TS__SparseArraySpread = ____lualib.__TS__SparseArraySpread
@@ -464,11 +356,13 @@ local __TS__ArrayEvery = ____lualib.__TS__ArrayEvery
 local ____exports = {}
 local ____entity_2Dtracker = require("dataCollectors.entity-tracker")
 local EntityTracker = ____entity_2Dtracker.default
+local ____util = require("util")
+local list_to_map = ____util.list_to_map
 local stoppedStatuses = {disabled_by_script = true, marked_for_deconstruction = true, no_recipe = true}
 local function isStoppingStatus(self, status)
     return stoppedStatuses[status] ~= nil
 end
-local commonStatuses = {
+local commonStatuses = list_to_map({
     "working",
     "normal",
     "no_power",
@@ -477,8 +371,9 @@ local commonStatuses = {
     "disabled_by_control_behavior",
     "disabled_by_script",
     "marked_for_deconstruction"
-}
-local ____array_0 = __TS__SparseArrayNew(table.unpack(commonStatuses))
+})
+local ____list_to_map_1 = list_to_map
+local ____array_0 = __TS__SparseArrayNew(table.unpack(__TS__ObjectKeys(commonStatuses)))
 __TS__SparseArrayPush(
     ____array_0,
     "no_recipe",
@@ -486,10 +381,15 @@ __TS__SparseArrayPush(
     "full_output",
     "item_ingredient_shortage"
 )
-local craftingMachineStatuses = {__TS__SparseArraySpread(____array_0)}
-local ____array_1 = __TS__SparseArrayNew(table.unpack(commonStatuses))
-__TS__SparseArrayPush(____array_1, "no_ingredients")
-local furnaceStatuses = {__TS__SparseArraySpread(____array_1)}
+local craftingMachineStatuses = ____list_to_map_1({__TS__SparseArraySpread(____array_0)})
+local ____list_to_map_3 = list_to_map
+local ____array_2 = __TS__SparseArrayNew(table.unpack(__TS__ObjectKeys(commonStatuses)))
+__TS__SparseArrayPush(____array_2, "no_ingredients")
+local furnaceStatuses = ____list_to_map_3({__TS__SparseArraySpread(____array_2)})
+local reverseMap = {}
+for key, value in pairs(defines.entity_status) do
+    reverseMap[value] = key
+end
 ____exports.default = __TS__Class()
 local MachineProduction = ____exports.default
 MachineProduction.name = "MachineProduction"
@@ -511,10 +411,12 @@ end
 function MachineProduction.prototype.getStatus(self, entity)
     local keys = (entity.type == "assembling-machine" or entity.type == "rocket-silo") and craftingMachineStatuses or (entity.type == "furnace" and furnaceStatuses or error("Invalid entity type"))
     local status = entity.status
-    for ____, key in ipairs(keys) do
-        if defines.entity_status[key] == status then
-            return key
-        end
+    if status == nil then
+        return "unknown"
+    end
+    local statusText = reverseMap[status]
+    if keys[statusText] ~= nil then
+        return statusText
     end
     log("Unknown status for crafting machine: " .. tostring(status))
     for key, value in pairs(defines.entity_status) do
@@ -542,8 +444,8 @@ function MachineProduction.prototype.addDataPoint(self, entity, info, status)
         local productsFinished = entity.products_finished
         local delta = productsFinished - info.lastProductsFinished
         info.lastProductsFinished = productsFinished
-        local ____currentProduction_production_2 = currentProduction.production
-        ____currentProduction_production_2[#____currentProduction_production_2 + 1] = {tick, delta, status}
+        local ____currentProduction_production_4 = currentProduction.production
+        ____currentProduction_production_4[#____currentProduction_production_4 + 1] = {tick, delta, status}
     end
 end
 function MachineProduction.prototype.markProductionFinished(self, entity, info, status, reason)
@@ -579,8 +481,8 @@ function MachineProduction.prototype.tryCheckRunningChanged(self, entity, knownS
     end
 end
 function MachineProduction.prototype.checkRunningChanged(self, entity, info, status, knownStopReason)
-    local ____opt_4 = entity.get_recipe()
-    local recipe = ____opt_4 and ____opt_4.name
+    local ____opt_6 = entity.get_recipe()
+    local recipe = ____opt_6 and ____opt_6.name
     local lastRecipe = info.lastRecipe
     if not recipe and entity.type == "furnace" then
         recipe = lastRecipe
@@ -659,7 +561,6 @@ return ____exports
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
 local __TS__ClassExtends = ____lualib.__TS__ClassExtends
-local __TS__Delete = ____lualib.__TS__Delete
 local ____exports = {}
 local ____entity_2Dtracker = require("dataCollectors.entity-tracker")
 local EntityTracker = ____entity_2Dtracker.default
@@ -667,16 +568,16 @@ ____exports.default = __TS__Class()
 local BufferAmounts = ____exports.default
 BufferAmounts.name = "BufferAmounts"
 __TS__ClassExtends(BufferAmounts, EntityTracker)
-function BufferAmounts.prototype.____constructor(self, nth_tick_period, minDataPointsToDetermineItemType)
+function BufferAmounts.prototype.____constructor(self, nth_tick_period, minDataPointsToDetermineItem)
     if nth_tick_period == nil then
         nth_tick_period = 60 * 5
     end
-    if minDataPointsToDetermineItemType == nil then
-        minDataPointsToDetermineItemType = 5
+    if minDataPointsToDetermineItem == nil then
+        minDataPointsToDetermineItem = 5
     end
     EntityTracker.prototype.____constructor(self, {filter = "type", type = "container"})
     self.nth_tick_period = nth_tick_period
-    self.minDataPointsToDetermineItemType = minDataPointsToDetermineItemType
+    self.minDataPointsToDetermineItem = minDataPointsToDetermineItem
 end
 function BufferAmounts.prototype.initialData(self, entity)
     if not entity.get_inventory(defines.inventory.chest) then
@@ -690,19 +591,20 @@ function BufferAmounts.prototype.initialData(self, entity)
         itemCounts = {}
     }
 end
-function BufferAmounts.prototype.getMaxKey(self, obj)
+function BufferAmounts.prototype.getMajorityKey(self, obj)
     local maxKey
     local max = 0
+    local total = 0
     for key, value in pairs(obj) do
-        if value == max then
-            maxKey = nil
-        end
         if value > max then
             max = value
             maxKey = key
         end
+        total = total + value
     end
-    return maxKey
+    if max > total / 2 then
+        return maxKey
+    end
 end
 function BufferAmounts.prototype.onPeriodicUpdate(self, entity, data)
     local amounts = data.amounts
@@ -716,7 +618,7 @@ function BufferAmounts.prototype.onPeriodicUpdate(self, entity, data)
             return
         end
         itemCounts[#itemCounts + 1] = {time = game.tick, counts = counts}
-        if #itemCounts == self.minDataPointsToDetermineItemType then
+        if #itemCounts == self.minDataPointsToDetermineItem then
             self:determineItemType(data)
         end
         return
@@ -727,13 +629,13 @@ function BufferAmounts.prototype.determineItemType(self, data)
     local itemCounts = data.itemCounts
     for ____, ____value in ipairs(itemCounts) do
         local counts = ____value.counts
-        local maxKey = self:getMaxKey(counts)
+        local maxKey = self:getMajorityKey(counts)
         if maxKey then
             maxAtTime[maxKey] = (maxAtTime[maxKey] or 0) + 1
         end
     end
-    local finalMax = self:getMaxKey(maxAtTime)
-    if not (finalMax and maxAtTime[finalMax] > self.minDataPointsToDetermineItemType / 2) then
+    local finalMax = self:getMajorityKey(maxAtTime)
+    if not (finalMax and maxAtTime[finalMax] > self.minDataPointsToDetermineItem / 2) then
         self:removeEntry(data.unitNumber)
         return
     end
@@ -745,7 +647,7 @@ function BufferAmounts.prototype.determineItemType(self, data)
         local ____data_amounts_0 = data.amounts
         ____data_amounts_0[#____data_amounts_0 + 1] = {time, counts[finalMax] or 0}
     end
-    __TS__Delete(data, "itemCounts")
+    data.itemCounts = nil
 end
 function BufferAmounts.prototype.exportData(self)
     local buffers = {}

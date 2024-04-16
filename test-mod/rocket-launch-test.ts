@@ -9,6 +9,6 @@ test("rocket-launch", () => {
     simulateEvent(defines.events.on_rocket_launched, { rocket: nil! })
 
     const data = dc.exportData()
-    expect(data.rocketLaunchTimes).toEqual([game.tick])
+    expect(data.rocketLaunchTimes).toEqual([10])
   })
 })
