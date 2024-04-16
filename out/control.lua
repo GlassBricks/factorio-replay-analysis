@@ -443,13 +443,55 @@ function MachineProduction.prototype.addDataPoint(self, entity, info, status)
     local recipeProduction = info.recipeProduction
     local currentProduction = recipeProduction[#recipeProduction]
     local lastEntry = currentProduction.production[#currentProduction.production]
-    if lastEntry == nil or lastEntry[1] ~= tick then
-        local productsFinished = entity.products_finished
-        local delta = productsFinished - info.lastProductsFinished
-        info.lastProductsFinished = productsFinished
-        local ____currentProduction_production_4 = currentProduction.production
-        ____currentProduction_production_4[#____currentProduction_production_4 + 1] = {tick, delta, status}
+    if not (lastEntry == nil or lastEntry[1] ~= tick) then
+        return
     end
+    local productsFinished = entity.products_finished
+    local delta = productsFinished - info.lastProductsFinished
+    info.lastProductsFinished = productsFinished
+    local extraInfo = nil
+    if status == "item_ingredient_shortage" then
+        local currentInputs = entity.get_inventory(defines.inventory.assembling_machine_input).get_contents()
+        local needed = entity.get_recipe().ingredients
+        local missingIngredients = {}
+        for ____, ____value in ipairs(needed) do
+            local ____type = ____value.type
+            local amount = ____value.amount
+            local name = ____value.name
+            do
+                if ____type ~= "item" then
+                    goto __continue16
+                end
+                local currentAmount = currentInputs[name]
+                if currentAmount == nil or currentAmount < amount then
+                    missingIngredients[#missingIngredients + 1] = name
+                end
+            end
+            ::__continue16::
+        end
+        extraInfo = missingIngredients
+    elseif status == "fluid_ingredient_shortage" then
+        local needed = entity.get_recipe().ingredients
+        local missingIngredients = {}
+        for ____, ____value in ipairs(needed) do
+            local ____type = ____value.type
+            local amount = ____value.amount
+            local name = ____value.name
+            do
+                if ____type ~= "fluid" then
+                    goto __continue21
+                end
+                local currentAmount = entity.get_fluid_count(name)
+                if currentAmount == nil or currentAmount < amount then
+                    missingIngredients[#missingIngredients + 1] = name
+                end
+            end
+            ::__continue21::
+        end
+        extraInfo = missingIngredients
+    end
+    local ____currentProduction_production_4 = currentProduction.production
+    ____currentProduction_production_4[#____currentProduction_production_4 + 1] = {tick, delta, status, extraInfo}
 end
 function MachineProduction.prototype.markProductionFinished(self, entity, info, status, reason)
     info.lastRunningRecipe = nil
@@ -561,7 +603,7 @@ function MachineProduction.prototype.exportData(self)
                 table.remove(recipes)
             end
             if #recipes == 0 then
-                goto __continue36
+                goto __continue46
             end
             machines[#machines + 1] = {
                 name = machine.name,
@@ -571,7 +613,7 @@ function MachineProduction.prototype.exportData(self)
                 recipes = recipes
             }
         end
-        ::__continue36::
+        ::__continue46::
     end
     return {period = self.nth_tick_period, machines = machines}
 end
@@ -598,17 +640,23 @@ function BufferAmounts.prototype.____constructor(self, nth_tick_period, minDataP
     if includeTanks == nil then
         includeTanks = true
     end
-    EntityTracker.prototype.____constructor(self, {filter = "type", type = {"container", "logistic-container"}}, {filter = "type", type = "storage-tank", mode = "or"})
     self.nth_tick_period = nth_tick_period
     self.minDataPointsToDetermineItem = minDataPointsToDetermineItem
     self.includeTanks = includeTanks
+    local filters = {{filter = "type", type = {"container", "logistic-container"}}}
+    if includeTanks then
+        filters[#filters + 1] = {filter = "type", type = "storage-tank", mode = "or"}
+    end
+    EntityTracker.prototype.____constructor(
+        self,
+        table.unpack(filters)
+    )
 end
 function BufferAmounts.prototype.initialData(self, entity)
-    if not entity.get_inventory(defines.inventory.chest) then
-        return nil
-    end
+    local ____type = entity.type == "storage-tank" and "tank" or "chest"
     return {
         name = entity.name,
+        type = ____type,
         unitNumber = entity.unit_number,
         location = entity.position,
         timeBuilt = game.tick,
@@ -633,11 +681,11 @@ end
 function BufferAmounts.prototype.onPeriodicUpdate(self, entity, data)
     local amounts = data.amounts
     if amounts then
-        local itemCount = entity.get_inventory(defines.inventory.chest).get_item_count(assert(data.item))
-        amounts[#amounts + 1] = {game.tick, itemCount}
+        local counts = data.type == "tank" and entity.get_fluid_count(assert(data.content)) or entity.get_inventory(defines.inventory.chest).get_item_count(assert(data.content))
+        amounts[#amounts + 1] = {game.tick, counts}
     else
         local itemCounts = assert(data.itemCounts)
-        local counts = entity.get_inventory(defines.inventory.chest).get_contents()
+        local counts = data.type == "tank" and entity.get_fluid_contents() or entity.get_inventory(defines.inventory.chest).get_contents()
         if (next(counts)) == nil then
             return
         end
@@ -663,7 +711,7 @@ function BufferAmounts.prototype.determineItemType(self, data)
         self:removeEntry(data.unitNumber)
         return
     end
-    data.item = finalMax
+    data.content = finalMax
     data.amounts = {}
     for ____, ____value in ipairs(itemCounts) do
         local time = ____value.time
@@ -691,10 +739,11 @@ function BufferAmounts.prototype.exportData(self)
             end
             buffers[#buffers + 1] = {
                 name = data.name,
+                type = data.type,
                 unitNumber = data.unitNumber,
                 location = data.location,
                 timeBuilt = data.timeBuilt,
-                item = data.item,
+                content = data.content,
                 amounts = amounts
             }
         end
