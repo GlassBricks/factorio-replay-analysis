@@ -126,6 +126,45 @@ local function __TS__ArrayEvery(self, callbackfn, thisArg)
     return true
 end
 
+local function __TS__ArrayMap(self, callbackfn, thisArg)
+    local result = {}
+    for i = 1, #self do
+        result[i] = callbackfn(thisArg, self[i], i - 1, self)
+    end
+    return result
+end
+
+local function __TS__ArraySome(self, callbackfn, thisArg)
+    for i = 1, #self do
+        if callbackfn(thisArg, self[i], i - 1, self) then
+            return true
+        end
+    end
+    return false
+end
+
+local function __TS__ObjectValues(obj)
+    local result = {}
+    local len = 0
+    for key in pairs(obj) do
+        len = len + 1
+        result[len] = obj[key]
+    end
+    return result
+end
+
+local function __TS__ArrayFilter(self, callbackfn, thisArg)
+    local result = {}
+    local len = 0
+    for i = 1, #self do
+        if callbackfn(thisArg, self[i], i - 1, self) then
+            len = len + 1
+            result[len] = self[i]
+        end
+    end
+    return result
+end
+
 local function __TS__New(target, ...)
     local instance = setmetatable({}, target.prototype)
     instance:____constructor(...)
@@ -143,6 +182,10 @@ return {
   __TS__SparseArraySpread = __TS__SparseArraySpread,
   __TS__ClassExtends = __TS__ClassExtends,
   __TS__ArrayEvery = __TS__ArrayEvery,
+  __TS__ArrayMap = __TS__ArrayMap,
+  __TS__ArraySome = __TS__ArraySome,
+  __TS__ObjectValues = __TS__ObjectValues,
+  __TS__ArrayFilter = __TS__ArrayFilter,
   __TS__New = __TS__New
 }
  end,
@@ -853,6 +896,73 @@ function ResearchTiming.prototype.exportData(self)
 end
 return ____exports
  end,
+["dataCollectors.lab-contents"] = function(...) 
+local ____lualib = require("lualib_bundle")
+local __TS__Class = ____lualib.__TS__Class
+local __TS__ClassExtends = ____lualib.__TS__ClassExtends
+local __TS__ArrayMap = ____lualib.__TS__ArrayMap
+local __TS__ArraySome = ____lualib.__TS__ArraySome
+local __TS__ObjectValues = ____lualib.__TS__ObjectValues
+local __TS__ArrayFilter = ____lualib.__TS__ArrayFilter
+local ____exports = {}
+local ____entity_2Dtracker = require("dataCollectors.entity-tracker")
+local EntityTracker = ____entity_2Dtracker.default
+local sciencePacks = {
+    "automation-science-pack",
+    "logistic-science-pack",
+    "chemical-science-pack",
+    "military-science-pack",
+    "production-science-pack",
+    "utility-science-pack",
+    "space-science-pack"
+}
+____exports.default = __TS__Class()
+local LabContents = ____exports.default
+LabContents.name = "LabContents"
+__TS__ClassExtends(LabContents, EntityTracker)
+function LabContents.prototype.____constructor(self, nth_tick_period)
+    if nth_tick_period == nil then
+        nth_tick_period = 60
+    end
+    EntityTracker.prototype.____constructor(self, {filter = "type", type = "lab"})
+    self.nth_tick_period = nth_tick_period
+end
+function LabContents.prototype.initialData(self, entity)
+    return {
+        name = entity.name,
+        unitNumber = entity.unit_number,
+        location = entity.position,
+        timeBuilt = game.tick,
+        packs = {}
+    }
+end
+function LabContents.prototype.onPeriodicUpdate(self, entity, data)
+    local contents = entity.get_inventory(defines.inventory.lab_input).get_contents()
+    local packCounts = __TS__ArrayMap(
+        sciencePacks,
+        function(____, pack) return contents[pack] or 0 end
+    )
+    local ____data_packs_0 = data.packs
+    ____data_packs_0[#____data_packs_0 + 1] = {
+        game.tick,
+        table.unpack(packCounts)
+    }
+end
+function LabContents.prototype.exportData(self)
+    local labData = __TS__ArrayFilter(
+        __TS__ObjectValues(self.entityData),
+        function(____, data) return __TS__ArraySome(
+            data.packs,
+            function(____, a) return __TS__ArraySome(
+                a,
+                function(____, amt, index) return index > 0 and amt > 0 end
+            ) end
+        ) end
+    )
+    return {period = self.nth_tick_period, sciencePacks = sciencePacks, labs = labData}
+end
+return ____exports
+ end,
 ["main"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__New = ____lualib.__TS__New
@@ -874,6 +984,8 @@ local ____player_2Dinventory = require("dataCollectors.player-inventory")
 local PlayerInventory = ____player_2Dinventory.default
 local ____research_2Dtiming = require("dataCollectors.research-timing")
 local ResearchTiming = ____research_2Dtiming.default
+local ____lab_2Dcontents = require("dataCollectors.lab-contents")
+local LabContents = ____lab_2Dcontents.default
 local exportOnSiloLaunch = true
 addDataCollector(
     nil,
@@ -898,6 +1010,10 @@ addDataCollector(
 addDataCollector(
     nil,
     __TS__New(BufferAmounts)
+)
+addDataCollector(
+    nil,
+    __TS__New(LabContents)
 )
 addDataCollector(
     nil,

@@ -6,6 +6,7 @@ import BufferAmounts from "./dataCollectors/buffer-amounts"
 import RocketLaunchTime from "./dataCollectors/rocket-launch-time"
 import PlayerInventory from "./dataCollectors/player-inventory"
 import ResearchTiming from "./dataCollectors/research-timing"
+import LabContents from "./dataCollectors/lab-contents"
 
 const exportOnSiloLaunch = true
 
@@ -24,6 +25,7 @@ addDataCollector(
   ]),
 )
 addDataCollector(new BufferAmounts())
+addDataCollector(new LabContents())
 addDataCollector(new ResearchTiming())
 addDataCollector(new RocketLaunchTime())
 
