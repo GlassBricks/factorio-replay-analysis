@@ -28,6 +28,9 @@
       "event_handler"
     ]
   },
+  "include": [
+    "src"
+  ],
   "exclude": [
     "**/node_modules/"
   ]
