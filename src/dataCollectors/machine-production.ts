@@ -1,6 +1,6 @@
-import { MapPosition } from "factorio:prototype"
 import {
   LuaEntity,
+  MapPosition,
   nil,
   OnEntityDiedEvent,
   OnEntitySettingsPastedEvent,

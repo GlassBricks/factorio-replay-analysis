@@ -1,6 +1,5 @@
-import { MapPosition } from "factorio:prototype"
 import EntityTracker from "./entity-tracker"
-import { LuaEntity, nil } from "factorio:runtime"
+import { LuaEntity, MapPosition, nil } from "factorio:runtime"
 import { DataCollector } from "../data-collector"
 
 export interface SingleLabData {
