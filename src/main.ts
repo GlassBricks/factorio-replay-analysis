@@ -12,7 +12,7 @@ const exportOnSiloLaunch = true
 
 // data collectors
 addDataCollector(new PlayerPosition())
-addDataCollector(new PlayerInventory())
+addDataCollector(new PlayerInventory(60))
 addDataCollector(
   new MachineProduction([
     "assembling-machine-1",

@@ -993,7 +993,7 @@ addDataCollector(
 )
 addDataCollector(
     nil,
-    __TS__New(PlayerInventory)
+    __TS__New(PlayerInventory, 60)
 )
 addDataCollector(
     nil,
