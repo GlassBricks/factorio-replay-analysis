@@ -31,7 +31,7 @@
   },
   "type": "module",
   "scripts": {
-    "clean": "del-cli \"src/**/*.lua\" \"src/**/*.map\" \"!**/*.def.lua\"",
+    "clean": "del-cli out ./test-mod/**/*.lua",
     "build": "tstl -p tsconfig.release.json",
     "build-install": "tstl && ./install.sh",
     "build:test": "tstl -p tsconfig.test.json",
