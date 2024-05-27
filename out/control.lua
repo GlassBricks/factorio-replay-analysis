@@ -404,6 +404,18 @@ local ____entity_2Dtracker = require("dataCollectors.entity-tracker")
 local EntityTracker = ____entity_2Dtracker.default
 local ____util = require("util")
 local list_to_map = ____util.list_to_map
+local function machineConfigEqual(self, a, b)
+    return a.recipe == b.recipe and a.craftingSpeed == b.craftingSpeed and a.productivityBonus == b.productivityBonus
+end
+local function nullableEqual(self, a, b, equal)
+    if a == nil then
+        return b == nil
+    end
+    if b == nil then
+        return false
+    end
+    return equal(nil, a, b)
+end
 local stoppedStatuses = {disabled_by_script = true, marked_for_deconstruction = true, no_recipe = true}
 local function isStoppingStatus(self, status)
     return stoppedStatuses[status] ~= nil
@@ -477,21 +489,23 @@ function MachineProduction.prototype.initialData(self, entity)
         location = entity.position,
         timeBuilt = game.tick,
         lastProductsFinished = 0,
-        lastRunningRecipe = nil,
+        lastConfig = nil,
         recipeProduction = {}
     }
 end
 function MachineProduction.prototype.addDataPoint(self, entity, info, status)
     local tick = game.tick
-    local recipeProduction = info.recipeProduction
-    local currentProduction = recipeProduction[#recipeProduction]
-    local lastEntry = currentProduction.production[#currentProduction.production]
+    local configEntries = info.recipeProduction
+    local currentConfig = configEntries[#configEntries]
+    local lastEntry = currentConfig.production[#currentConfig.production]
     if not (lastEntry == nil or lastEntry[1] ~= tick) then
         return
     end
     local productsFinished = entity.products_finished
     local delta = productsFinished - info.lastProductsFinished
     info.lastProductsFinished = productsFinished
+    local craftingProgress = entity.crafting_progress
+    local bonusProgress = entity.bonus_progress
     local extraInfo = nil
     if status == "item_ingredient_shortage" then
         local currentInputs = entity.get_inventory(defines.inventory.assembling_machine_input).get_contents()
@@ -503,14 +517,14 @@ function MachineProduction.prototype.addDataPoint(self, entity, info, status)
             local name = ____value.name
             do
                 if ____type ~= "item" then
-                    goto __continue16
+                    goto __continue20
                 end
                 local currentAmount = currentInputs[name]
                 if currentAmount == nil or currentAmount < amount then
                     missingIngredients[#missingIngredients + 1] = name
                 end
             end
-            ::__continue16::
+            ::__continue20::
         end
         extraInfo = missingIngredients
     elseif status == "fluid_ingredient_shortage" then
@@ -522,22 +536,29 @@ function MachineProduction.prototype.addDataPoint(self, entity, info, status)
             local name = ____value.name
             do
                 if ____type ~= "fluid" then
-                    goto __continue21
+                    goto __continue25
                 end
                 local currentAmount = entity.get_fluid_count(name)
                 if currentAmount == nil or currentAmount < amount then
                     missingIngredients[#missingIngredients + 1] = name
                 end
             end
-            ::__continue21::
+            ::__continue25::
         end
         extraInfo = missingIngredients
     end
-    local ____currentProduction_production_4 = currentProduction.production
-    ____currentProduction_production_4[#____currentProduction_production_4 + 1] = {tick, delta, status, extraInfo}
+    local ____currentConfig_production_4 = currentConfig.production
+    ____currentConfig_production_4[#____currentConfig_production_4 + 1] = {
+        tick,
+        delta,
+        craftingProgress,
+        bonusProgress,
+        status,
+        extraInfo
+    }
 end
 function MachineProduction.prototype.markProductionFinished(self, entity, info, status, reason)
-    info.lastRunningRecipe = nil
+    info.lastConfig = nil
     local recipeProduction = info.recipeProduction
     local lastProduction = recipeProduction[#recipeProduction]
     if lastProduction == nil then
@@ -559,10 +580,16 @@ function MachineProduction.prototype.markProductionFinished(self, entity, info, 
     lastProduction.timeStopped = game.tick
     lastProduction.stoppedReason = reason
 end
-function MachineProduction.prototype.startNewProduction(self, info, recipe)
-    info.lastRunningRecipe = recipe
+function MachineProduction.prototype.startNewProduction(self, info, config)
+    info.lastConfig = config
     local ____info_recipeProduction_5 = info.recipeProduction
-    ____info_recipeProduction_5[#____info_recipeProduction_5 + 1] = {recipe = recipe, timeStarted = game.tick, production = {}}
+    ____info_recipeProduction_5[#____info_recipeProduction_5 + 1] = {
+        recipe = config.recipe,
+        craftingSpeed = config.craftingSpeed,
+        productivityBonus = config.productivityBonus,
+        timeStarted = game.tick,
+        production = {}
+    }
 end
 function MachineProduction.prototype.tryCheckRunningChanged(self, entity, knownStopReason)
     local info = self:getEntityData(entity)
@@ -571,6 +598,10 @@ function MachineProduction.prototype.tryCheckRunningChanged(self, entity, knownS
     end
 end
 function MachineProduction.prototype.checkRunningChanged(self, entity, info, status, knownStopReason)
+    if status == nil then
+        status = self:getStatus(entity)
+    end
+    local isStopped = knownStopReason ~= nil or isStoppingStatus(nil, status)
     local ____entity_get_recipe_result_9 = entity.get_recipe()
     if ____entity_get_recipe_result_9 == nil then
         local ____temp_8
@@ -582,27 +613,24 @@ function MachineProduction.prototype.checkRunningChanged(self, entity, info, sta
         ____entity_get_recipe_result_9 = ____temp_8
     end
     local recipe = ____entity_get_recipe_result_9 and ____entity_get_recipe_result_9.name
-    local lastRecipe = info.lastRunningRecipe
-    local recipeChanged = recipe ~= lastRecipe
-    if status == nil then
-        status = self:getStatus(entity)
-    end
-    local isStopped = knownStopReason ~= nil or isStoppingStatus(nil, status)
+    local lastConfig = info.lastConfig
+    local config = recipe and ({recipe = recipe, craftingSpeed = entity.crafting_speed, productivityBonus = entity.productivity_bonus}) or nil
+    local configChanged = not nullableEqual(nil, lastConfig, config, machineConfigEqual)
     local updated = false
-    if lastRecipe then
-        if recipeChanged or status == "no_recipe" then
-            self:markProductionFinished(entity, info, status, "recipe_changed")
+    if lastConfig then
+        if configChanged then
+            self:markProductionFinished(entity, info, status, "configuration_changed")
             updated = true
         elseif isStopped then
             self:markProductionFinished(entity, info, status, knownStopReason or status)
             updated = true
         end
     end
-    if recipe and (recipeChanged or #info.recipeProduction == 0) then
-        self:startNewProduction(info, recipe)
+    if config and (configChanged or #info.recipeProduction == 0) then
+        self:startNewProduction(info, config)
         updated = true
     end
-    return updated, not isStopped and recipe ~= nil
+    return updated, not isStopped and config ~= nil
 end
 function MachineProduction.prototype.onDeleted(self, entity, event)
     self:tryCheckRunningChanged(entity, event.name == defines.events.on_entity_died and "entity_died" or "mined")
@@ -621,6 +649,16 @@ function MachineProduction.prototype.on_gui_closed(self, event)
 end
 function MachineProduction.prototype.on_entity_settings_pasted(self, event)
     self:tryCheckRunningChanged(event.destination, nil)
+end
+function MachineProduction.prototype.on_player_fast_transferred(self, event)
+    self:tryCheckRunningChanged(event.entity, nil)
+end
+function MachineProduction.prototype.on_player_cursor_stack_changed(self, event)
+    local player = game.players[event.player_index]
+    local selected = player.selected
+    if selected then
+        self:tryCheckRunningChanged(selected, nil)
+    end
 end
 function MachineProduction.prototype.onPeriodicUpdate(self, entity, data)
     local status = self:getStatus(entity)
@@ -646,7 +684,7 @@ function MachineProduction.prototype.exportData(self)
                 table.remove(recipes)
             end
             if #recipes == 0 then
-                goto __continue46
+                goto __continue53
             end
             machines[#machines + 1] = {
                 name = machine.name,
@@ -656,7 +694,7 @@ function MachineProduction.prototype.exportData(self)
                 recipes = recipes
             }
         end
-        ::__continue46::
+        ::__continue53::
     end
     return {period = self.nth_tick_period, machines = machines}
 end

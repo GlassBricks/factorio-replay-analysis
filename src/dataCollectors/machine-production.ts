@@ -6,6 +6,8 @@ import {
   OnEntitySettingsPastedEvent,
   OnGuiClosedEvent,
   OnMarkedForDeconstructionEvent,
+  OnPlayerCursorStackChangedEvent,
+  OnPlayerFastTransferredEvent,
   OnPrePlayerMinedItemEvent,
   OnRobotPreMinedEvent,
   UnitNumber,
@@ -29,14 +31,43 @@ interface MachineData {
   recipes: MachineRecipeProduction[]
 }
 
-type StopReason = "recipe_changed" | "mined" | "entity_died" | "marked_for_deconstruction" | "disabled_by_script"
+type StopReason = "configuration_changed" | "mined" | "entity_died" | "marked_for_deconstruction" | "disabled_by_script"
+
+interface MachineConfig {
+  recipe: string
+  craftingSpeed: number
+  productivityBonus: number
+}
+
+function machineConfigEqual(a: MachineConfig, b: MachineConfig) {
+  return a.recipe == b.recipe && a.craftingSpeed == b.craftingSpeed && a.productivityBonus == b.productivityBonus
+}
+
+function nullableEqual<T>(a: T | nil, b: T | nil, equal: (a: T, b: T) => boolean) {
+  if (a == nil) return b == nil
+  if (b == nil) return false
+  return equal(a, b)
+}
 
 interface MachineRecipeProduction {
+  // bottom 3 is primary key
   recipe: string
+  craftingSpeed: number
+  productivityBonus: number
+
   timeStarted: number
+
   timeStopped?: number
   stoppedReason?: StopReason
-  production: [time: number, productsFinished: number, status: EntityStatus, additionalInfo?: unknown][]
+
+  production: [
+    time: number,
+    productsFinished: number,
+    craftingProgress: number,
+    productivityProgress: number,
+    status: EntityStatus,
+    additionalInfo?: unknown,
+  ][]
 }
 
 const stoppedStatuses = {
@@ -83,7 +114,7 @@ interface TrackedMachineData {
   location: MapPosition
   timeBuilt: number
   lastProductsFinished: number
-  lastRunningRecipe: string | nil
+  lastConfig?: MachineConfig
   recipeProduction: MachineRecipeProduction[]
 }
 
@@ -140,22 +171,26 @@ export default class MachineProduction
       location: entity.position,
       timeBuilt: game.tick,
       lastProductsFinished: 0,
-      lastRunningRecipe: nil,
+      lastConfig: nil,
       recipeProduction: [],
     }
   }
 
   private addDataPoint(entity: LuaEntity, info: TrackedMachineData, status: EntityStatus) {
     const tick = game.tick
-    const recipeProduction = info.recipeProduction
-    const currentProduction = recipeProduction[recipeProduction.length - 1]
-    const lastEntry = currentProduction.production[currentProduction.production.length - 1]
+    const configEntries = info.recipeProduction
+    const currentConfig = configEntries[configEntries.length - 1]
+
+    const lastEntry = currentConfig.production[currentConfig.production.length - 1]
     if (!(lastEntry == nil || lastEntry[0] != tick)) {
       return
     }
     const productsFinished = entity.products_finished
     const delta = productsFinished - info.lastProductsFinished
     info.lastProductsFinished = productsFinished
+
+    const craftingProgress = entity.crafting_progress
+    const bonusProgress = entity.bonus_progress
 
     let extraInfo: unknown = nil
     if (status == "item_ingredient_shortage") {
@@ -183,7 +218,7 @@ export default class MachineProduction
       extraInfo = missingIngredients
     }
 
-    currentProduction.production.push([tick, delta, status, extraInfo])
+    currentConfig.production.push([tick, delta, craftingProgress, bonusProgress, status, extraInfo])
   }
 
   private markProductionFinished(
@@ -192,7 +227,7 @@ export default class MachineProduction
     status: EntityStatus,
     reason: StopReason,
   ) {
-    info.lastRunningRecipe = nil
+    info.lastConfig = nil
     const recipeProduction = info.recipeProduction
     const lastProduction = recipeProduction[recipeProduction.length - 1]
     if (lastProduction == nil) return
@@ -206,10 +241,12 @@ export default class MachineProduction
     lastProduction.stoppedReason = reason
   }
 
-  private startNewProduction(info: TrackedMachineData, recipe: string) {
-    info.lastRunningRecipe = recipe
+  private startNewProduction(info: TrackedMachineData, config: MachineConfig) {
+    info.lastConfig = config
     info.recipeProduction.push({
-      recipe,
+      recipe: config.recipe,
+      craftingSpeed: config.craftingSpeed,
+      productivityBonus: config.productivityBonus,
       timeStarted: game.tick,
       production: [],
     })
@@ -231,26 +268,36 @@ export default class MachineProduction
     status: EntityStatus | nil,
     knownStopReason: StopReason | nil,
   ): LuaMultiReturn<[updated: boolean, isRunning: boolean]> {
-    const recipe = (entity.get_recipe() ?? (entity.type == "furnace" ? entity.previous_recipe : nil))?.name
-    const lastRecipe = info.lastRunningRecipe
-    const recipeChanged = recipe != lastRecipe
     status ??= this.getStatus(entity)
     const isStopped = knownStopReason != nil || isStoppingStatus(status)
+
+    const recipe = (entity.get_recipe() ?? (entity.type == "furnace" ? entity.previous_recipe : nil))?.name
+    const lastConfig = info.lastConfig
+    const config: MachineConfig | nil = recipe
+      ? {
+          recipe,
+          craftingSpeed: entity.crafting_speed,
+          productivityBonus: entity.productivity_bonus,
+        }
+      : nil
+
+    const configChanged = !nullableEqual(lastConfig, config, machineConfigEqual)
+
     let updated = false
-    if (lastRecipe) {
-      if (recipeChanged || status == "no_recipe") {
-        this.markProductionFinished(entity, info, status, "recipe_changed")
+    if (lastConfig) {
+      if (configChanged) {
+        this.markProductionFinished(entity, info, status, "configuration_changed")
         updated = true
       } else if (isStopped) {
         this.markProductionFinished(entity, info, status, knownStopReason ?? (status as StopReason))
         updated = true
       }
     }
-    if (recipe && (recipeChanged || info.recipeProduction.length == 0)) {
-      this.startNewProduction(info, recipe)
+    if (config && (configChanged || info.recipeProduction.length == 0)) {
+      this.startNewProduction(info, config)
       updated = true
     }
-    return $multi(updated, !isStopped && recipe != nil)
+    return $multi(updated, !isStopped && config != nil)
   }
 
   protected override onDeleted(
@@ -275,6 +322,18 @@ export default class MachineProduction
 
   on_entity_settings_pasted(event: OnEntitySettingsPastedEvent) {
     this.tryCheckRunningChanged(event.destination, nil)
+  }
+
+  on_player_fast_transferred(event: OnPlayerFastTransferredEvent) {
+    this.tryCheckRunningChanged(event.entity, nil)
+  }
+
+  on_player_cursor_stack_changed(event: OnPlayerCursorStackChangedEvent) {
+    const player = game.players[event.player_index]
+    const selected = player.selected
+    if (selected) {
+      this.tryCheckRunningChanged(selected, nil)
+    }
   }
 
   override onPeriodicUpdate(entity: LuaEntity, data: TrackedMachineData) {
