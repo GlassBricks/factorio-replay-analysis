@@ -31,24 +31,6 @@ interface MachineData {
   recipes: MachineRecipeProduction[]
 }
 
-type StopReason = "configuration_changed" | "mined" | "entity_died" | "marked_for_deconstruction" | "disabled_by_script"
-
-interface MachineConfig {
-  recipe: string
-  craftingSpeed: number
-  productivityBonus: number
-}
-
-function machineConfigEqual(a: MachineConfig, b: MachineConfig) {
-  return a.recipe == b.recipe && a.craftingSpeed == b.craftingSpeed && a.productivityBonus == b.productivityBonus
-}
-
-function nullableEqual<T>(a: T | nil, b: T | nil, equal: (a: T, b: T) => boolean) {
-  if (a == nil) return b == nil
-  if (b == nil) return false
-  return equal(a, b)
-}
-
 interface MachineRecipeProduction {
   // bottom 3 is primary key
   recipe: string
@@ -68,6 +50,24 @@ interface MachineRecipeProduction {
     status: EntityStatus,
     additionalInfo?: unknown,
   ][]
+}
+
+type StopReason = "configuration_changed" | "mined" | "entity_died" | "marked_for_deconstruction" | "disabled_by_script"
+
+interface MachineConfig {
+  recipe: string
+  craftingSpeed: number
+  productivityBonus: number
+}
+
+function machineConfigEqual(a: MachineConfig, b: MachineConfig) {
+  return a.recipe == b.recipe && a.craftingSpeed == b.craftingSpeed && a.productivityBonus == b.productivityBonus
+}
+
+function nullableEqual<T>(a: T | nil, b: T | nil, equal: (a: T, b: T) => boolean) {
+  if (a == nil) return b == nil
+  if (b == nil) return false
+  return equal(a, b)
 }
 
 const stoppedStatuses = {
