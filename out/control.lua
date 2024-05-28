@@ -856,6 +856,7 @@ return ____exports
 ["dataCollectors.player-inventory"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__Class = ____lualib.__TS__Class
+local __TS__ArrayMap = ____lualib.__TS__ArrayMap
 local ____exports = {}
 ____exports.default = __TS__Class()
 local PlayerInventory = ____exports.default
@@ -870,22 +871,49 @@ end
 function PlayerInventory.prototype.on_nth_tick(self, event)
     for ____, player in pairs(game.players) do
         local name = player.name
-        if not self.players[name] then
-            self.players[name] = {}
+        local playerData = self.players[name]
+        if not playerData then
+            local ____temp_0 = {inventory = {}, craftingQueue = {}, craftingEvents = {}}
+            self.players[name] = ____temp_0
+            playerData = ____temp_0
             do
                 local i = 0
                 while i < event.tick do
-                    local ____self_players_name_0 = self.players[name]
-                    ____self_players_name_0[#____self_players_name_0 + 1] = {}
+                    local ____playerData_inventory_1 = playerData.inventory
+                    ____playerData_inventory_1[#____playerData_inventory_1 + 1] = {}
+                    local ____playerData_craftingQueue_2 = playerData.craftingQueue
+                    ____playerData_craftingQueue_2[#____playerData_craftingQueue_2 + 1] = {}
                     i = i + self.nth_tick_period
                 end
             end
         end
-        local ____opt_1 = player.get_main_inventory()
-        local contents = ____opt_1 and ____opt_1.get_contents() or ({})
-        local ____self_players_name_3 = self.players[name]
-        ____self_players_name_3[#____self_players_name_3 + 1] = contents
+        local ____opt_3 = player.get_main_inventory()
+        local inventoryContents = ____opt_3 and ____opt_3.get_contents() or ({})
+        local ____playerData_inventory_5 = playerData.inventory
+        ____playerData_inventory_5[#____playerData_inventory_5 + 1] = inventoryContents
+        local ____temp_8 = player.controller_type == defines.controllers.character
+        if ____temp_8 then
+            local ____opt_6 = player.crafting_queue
+            ____temp_8 = ____opt_6 and __TS__ArrayMap(
+                player.crafting_queue,
+                function(____, item) return {recipe = item.recipe, item = item.recipe, count = item.count, prerequisite = item.prerequisite} end
+            )
+        end
+        local craftingQueue = ____temp_8 or ({})
+        local ____playerData_craftingQueue_9 = playerData.craftingQueue
+        ____playerData_craftingQueue_9[#____playerData_craftingQueue_9 + 1] = craftingQueue
     end
+end
+function PlayerInventory.prototype.on_player_crafted_item(self, event)
+    local playerName = game.get_player(event.player_index).name
+    local ____self_players_10, ____playerName_11 = self.players, playerName
+    if ____self_players_10[____playerName_11] == nil then
+        ____self_players_10[____playerName_11] = {inventory = {}, craftingQueue = {}, craftingEvents = {}}
+    end
+    local playerData = self.players[playerName]
+    local recipe = event.recipe
+    local ____playerData_craftingEvents_13 = playerData.craftingEvents
+    ____playerData_craftingEvents_13[#____playerData_craftingEvents_13 + 1] = {time = game.tick, recipe = recipe.name}
 end
 function PlayerInventory.prototype.exportData(self)
     return {period = self.nth_tick_period, players = self.players}

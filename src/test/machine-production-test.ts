@@ -189,7 +189,6 @@ test("tracks a machine if modules changed", () => {
   after_ticks(500, () => {
     done()
     const data = dc.exportData()
-    game.print(serpent.block(data.machines[0]))
     expect(data.machines[0].recipes[0]).toEqual({
       recipe: "iron-gear-wheel",
       craftingSpeed: 0.75,
