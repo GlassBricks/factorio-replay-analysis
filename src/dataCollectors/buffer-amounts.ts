@@ -118,7 +118,7 @@ export default class BufferAmounts extends EntityTracker<TrackedBufferData> impl
     const finalMax = this.getMajorityKey(maxAtTime, 1 / 2)
     if (!finalMax) {
       // a multiplicity of items, probably not a buffer
-      this.removeEntry(data.unitNumber)
+      this.stopTracking(data.unitNumber)
       return
     }
     data.content = finalMax

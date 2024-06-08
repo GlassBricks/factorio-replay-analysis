@@ -59,28 +59,42 @@ export default abstract class EntityTracker<T> implements EventHandlers {
     this.onCreated(event.created_entity, event)
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  protected onDeleted(entity: LuaEntity, _event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent) {
+  private onEntityDeleted(
+    entity: LuaEntity,
+    _event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent,
+  ) {
     const unitNumber = entity.unit_number
-    if (unitNumber) {
-      this.removeEntry(unitNumber)
-    }
+    if (!unitNumber) return
+    const entry = this.getEntityData(entity, unitNumber)
+    if (!entry) return
+    this.onDeleted?.(entity, _event, entry)
+    this.stopTracking(unitNumber)
   }
 
-  protected removeEntry(unitNumber: UnitNumber) {
+  protected onDeleted?(
+    entity: LuaEntity,
+    event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent,
+    data: T,
+  ): void
+
+  protected stopTracking(unitNumber: UnitNumber) {
     delete this.trackedEntities[unitNumber]
   }
 
+  protected removeEntry(unitNumber: UnitNumber) {
+    delete this.entityData[unitNumber]
+  }
+
   on_pre_player_mined_item(event: OnPrePlayerMinedItemEvent) {
-    this.onDeleted(event.entity, event)
+    this.onEntityDeleted(event.entity, event)
   }
 
   on_robot_pre_mined(event: OnRobotPreMinedEvent) {
-    this.onDeleted(event.entity, event)
+    this.onEntityDeleted(event.entity, event)
   }
 
   on_entity_died(event: OnEntityDiedEvent) {
-    this.onDeleted(event.entity, event)
+    this.onEntityDeleted(event.entity, event)
   }
 
   protected getEntityData(entity: LuaEntity, unitNumber?: UnitNumber): T | nil {

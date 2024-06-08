@@ -347,23 +347,35 @@ end
 function EntityTracker.prototype.on_robot_built_entity(self, event)
     self:onCreated(event.created_entity, event)
 end
-function EntityTracker.prototype.onDeleted(self, entity, _event)
+function EntityTracker.prototype.onEntityDeleted(self, entity, _event)
     local unitNumber = entity.unit_number
-    if unitNumber then
-        self:removeEntry(unitNumber)
+    if not unitNumber then
+        return
     end
+    local entry = self:getEntityData(entity, unitNumber)
+    if not entry then
+        return
+    end
+    local ____opt_0 = self.onDeleted
+    if ____opt_0 ~= nil then
+        ____opt_0(self, entity, _event, entry)
+    end
+    self:stopTracking(unitNumber)
 end
-function EntityTracker.prototype.removeEntry(self, unitNumber)
+function EntityTracker.prototype.stopTracking(self, unitNumber)
     self.trackedEntities[unitNumber] = nil
 end
+function EntityTracker.prototype.removeEntry(self, unitNumber)
+    self.entityData[unitNumber] = nil
+end
 function EntityTracker.prototype.on_pre_player_mined_item(self, event)
-    self:onDeleted(event.entity, event)
+    self:onEntityDeleted(event.entity, event)
 end
 function EntityTracker.prototype.on_robot_pre_mined(self, event)
-    self:onDeleted(event.entity, event)
+    self:onEntityDeleted(event.entity, event)
 end
 function EntityTracker.prototype.on_entity_died(self, event)
-    self:onDeleted(event.entity, event)
+    self:onEntityDeleted(event.entity, event)
 end
 function EntityTracker.prototype.getEntityData(self, entity, unitNumber)
     if not entity.valid then
@@ -632,9 +644,8 @@ function MachineProduction.prototype.checkRunningChanged(self, entity, info, sta
     end
     return updated, not isStopped and config ~= nil
 end
-function MachineProduction.prototype.onDeleted(self, entity, event)
-    self:tryCheckRunningChanged(entity, event.name == defines.events.on_entity_died and "entity_died" or "mined")
-    EntityTracker.prototype.onDeleted(self, entity, event)
+function MachineProduction.prototype.onDeleted(self, entity, event, info)
+    self:checkRunningChanged(entity, info, nil, event.name == defines.events.on_entity_died and "entity_died" or "mined")
 end
 function MachineProduction.prototype.on_marked_for_deconstruction(self, event)
     self:tryCheckRunningChanged(event.entity, "marked_for_deconstruction")
@@ -789,7 +800,7 @@ function BufferAmounts.prototype.determineItemType(self, data)
     end
     local finalMax = self:getMajorityKey(maxAtTime, 1 / 2)
     if not finalMax then
-        self:removeEntry(data.unitNumber)
+        self:stopTracking(data.unitNumber)
         return
     end
     data.content = finalMax
@@ -1029,6 +1040,62 @@ function LabContents.prototype.exportData(self)
 end
 return ____exports
  end,
+["dataCollectors.roboport-usage"] = function(...) 
+local ____lualib = require("lualib_bundle")
+local __TS__Class = ____lualib.__TS__Class
+local __TS__ClassExtends = ____lualib.__TS__ClassExtends
+local __TS__ArraySome = ____lualib.__TS__ArraySome
+local __TS__ObjectValues = ____lualib.__TS__ObjectValues
+local ____exports = {}
+local ____entity_2Dtracker = require("dataCollectors.entity-tracker")
+local EntityTracker = ____entity_2Dtracker.default
+____exports.default = __TS__Class()
+local RoboportUsage = ____exports.default
+RoboportUsage.name = "RoboportUsage"
+__TS__ClassExtends(RoboportUsage, EntityTracker)
+function RoboportUsage.prototype.____constructor(self, nth_tick_period)
+    if nth_tick_period == nil then
+        nth_tick_period = 30
+    end
+    EntityTracker.prototype.____constructor(self, {filter = "type", type = "roboport"})
+    self.nth_tick_period = nth_tick_period
+end
+function RoboportUsage.prototype.initialData(self, entity, event)
+    if not entity.logistic_cell then
+        return
+    end
+    return {unitNumber = entity.unit_number, location = entity.position, timeBuilt = event.tick, usage = {}}
+end
+function RoboportUsage.prototype.onPeriodicUpdate(self, entity, data)
+    local ____data_usage_0 = data.usage
+    ____data_usage_0[#____data_usage_0 + 1] = {game.tick, entity.logistic_cell.charging_robot_count, entity.logistic_cell.to_charge_robot_count}
+end
+function RoboportUsage.prototype.onDeleted(self, _entity, event, data)
+    data.timeRemoved = event.tick
+    data.removedReason = event.name == defines.events.on_pre_player_mined_item and "mined" or (event.name == defines.events.on_robot_pre_mined and "deconstructed" or "destroyed")
+end
+function RoboportUsage.prototype.exportData(self)
+    for unitNumber, data in pairs(self.entityData) do
+        if not __TS__ArraySome(
+            data.usage,
+            function(____, ____bindingPattern0)
+                local numWaiting
+                local numCharging
+                numCharging = ____bindingPattern0[2]
+                numWaiting = ____bindingPattern0[3]
+                return numCharging > 0 or numWaiting > 0
+            end
+        ) then
+            self.entityData[unitNumber] = nil
+        end
+    end
+    return {
+        period = self.nth_tick_period,
+        roboports = __TS__ObjectValues(self.entityData)
+    }
+end
+return ____exports
+ end,
 ["main"] = function(...) 
 local ____lualib = require("lualib_bundle")
 local __TS__New = ____lualib.__TS__New
@@ -1052,6 +1119,8 @@ local ____research_2Dtiming = require("dataCollectors.research-timing")
 local ResearchTiming = ____research_2Dtiming.default
 local ____lab_2Dcontents = require("dataCollectors.lab-contents")
 local LabContents = ____lab_2Dcontents.default
+local ____roboport_2Dusage = require("dataCollectors.roboport-usage")
+local RoboportUsage = ____roboport_2Dusage.default
 local exportOnSiloLaunch = true
 addDataCollector(
     nil,
@@ -1088,6 +1157,10 @@ addDataCollector(
 addDataCollector(
     nil,
     __TS__New(RocketLaunchTime)
+)
+addDataCollector(
+    nil,
+    __TS__New(RoboportUsage)
 )
 if exportOnSiloLaunch then
     add_lib({events = {[defines.events.on_rocket_launched] = function() return exportAllData(nil) end}})

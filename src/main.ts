@@ -7,10 +7,10 @@ import RocketLaunchTime from "./dataCollectors/rocket-launch-time"
 import PlayerInventory from "./dataCollectors/player-inventory"
 import ResearchTiming from "./dataCollectors/research-timing"
 import LabContents from "./dataCollectors/lab-contents"
+import RoboportUsage from "./dataCollectors/roboport-usage"
 
 const exportOnSiloLaunch = true
 
-// data collectors
 addDataCollector(new PlayerPosition())
 addDataCollector(new PlayerInventory(60))
 addDataCollector(
@@ -28,6 +28,7 @@ addDataCollector(new BufferAmounts())
 addDataCollector(new LabContents())
 addDataCollector(new ResearchTiming())
 addDataCollector(new RocketLaunchTime())
+addDataCollector(new RoboportUsage())
 
 // options
 if (exportOnSiloLaunch) {

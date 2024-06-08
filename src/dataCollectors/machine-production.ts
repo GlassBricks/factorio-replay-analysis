@@ -303,9 +303,9 @@ export default class MachineProduction
   protected override onDeleted(
     entity: LuaEntity,
     event: OnPrePlayerMinedItemEvent | OnRobotPreMinedEvent | OnEntityDiedEvent,
+    info: TrackedMachineData,
   ) {
-    this.tryCheckRunningChanged(entity, event.name == defines.events.on_entity_died ? "entity_died" : "mined")
-    super.onDeleted(entity, event)
+    this.checkRunningChanged(entity, info, nil, event.name == defines.events.on_entity_died ? "entity_died" : "mined")
   }
 
   on_marked_for_deconstruction(event: OnMarkedForDeconstructionEvent) {
